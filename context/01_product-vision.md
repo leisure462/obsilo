@@ -1,14 +1,14 @@
-# Kilo Note – Product Vision
+# Kylo Note – Product Vision
 
 ## 1. Vision
 
-Kilo Note ist eine agentische Betriebsschicht für Obsidian.
+Kylo Note ist eine agentische Betriebsschicht für Obsidian.
 
 Es überträgt die Architektur- und Interaktionsprinzipien von Kilo Code
 (Tool-Use, Orchestrator, Approval-System, Modes, Checkpoints)
 auf den Kontext von Wissensarbeit in Markdown-Vaults.
 
-Kilo Note ist nicht nur ein Schreibassistent,
+Kylo Note ist nicht nur ein Schreibassistent,
 sondern ein kontrollierter Vault-Operator.
 
 ---

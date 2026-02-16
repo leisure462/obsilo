@@ -44,7 +44,7 @@ Graph:
 
 Kilo Code nutzt Shadow Git Repo.
 
-Kilo Note:
+Kylo Note:
 - isomorphic-git
 - internes Repo in `.kilonote/checkpoints`
 - Commit pro Tool-Action
