@@ -12,11 +12,13 @@ import type { BaseTool } from './BaseTool';
 import type { ToolName, ToolDefinition } from './types';
 
 // Import tools
-// Phase 1 tools:
 import { ReadFileTool } from './vault/ReadFileTool';
 import { WriteFileTool } from './vault/WriteFileTool';
-// import { ListFilesTool } from './vault/ListFilesTool'; // TODO: Phase 1
-// import { SearchFilesTool } from './vault/SearchFilesTool'; // TODO: Phase 1
+import { ListFilesTool } from './vault/ListFilesTool';
+import { SearchFilesTool } from './vault/SearchFilesTool';
+import { CreateFolderTool } from './vault/CreateFolderTool';
+import { DeleteFileTool } from './vault/DeleteFileTool';
+import { MoveFileTool } from './vault/MoveFileTool';
 
 export class ToolRegistry {
     private tools: Map<ToolName, BaseTool>;
@@ -32,25 +34,16 @@ export class ToolRegistry {
      * Register all internal (built-in) tools
      */
     private registerInternalTools(): void {
-        // Phase 1: Vault operation tools
+        // Vault: read/write
         this.register(new ReadFileTool(this.plugin));
         this.register(new WriteFileTool(this.plugin));
-        // this.register(new ListFilesTool(this.plugin)); // TODO: Phase 1
-        // this.register(new SearchFilesTool(this.plugin)); // TODO: Phase 1
-
-        // Phase 1: Content operation tools
-        // this.register(new ApplyDiffTool(this.plugin)); // TODO: Phase 1
-        // this.register(new SearchReplaceTool(this.plugin)); // TODO: Phase 1
-
-        // Phase 1: System tools
-        // this.register(new AttemptCompletionTool(this.plugin)); // TODO: Phase 1
-        // this.register(new UpdateTodoListTool(this.plugin)); // TODO: Phase 1
-
-        // Phase 6: Canvas tools (later)
-        // this.register(new CreateCanvasTool(this.plugin));
-
-        // Phase 7: Semantic tools (later)
-        // this.register(new SemanticSearchTool(this.plugin));
+        // Vault: navigation & search
+        this.register(new ListFilesTool(this.plugin));
+        this.register(new SearchFilesTool(this.plugin));
+        // Vault: file management
+        this.register(new CreateFolderTool(this.plugin));
+        this.register(new DeleteFileTool(this.plugin));
+        this.register(new MoveFileTool(this.plugin));
 
         console.log(`ToolRegistry: Registered ${this.getToolCount()} tools`);
     }

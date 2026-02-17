@@ -14,6 +14,7 @@ export type ToolName =
     | 'search_files'
     | 'create_folder'
     | 'delete_file'
+    | 'move_file'
     | 'apply_diff'
     | 'search_replace'
     | 'create_canvas'

@@ -231,7 +231,7 @@
 .chat-toolbar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     padding: 8px 12px;
     border-top: 1px solid var(--background-modifier-border);
     background: var(--background-secondary-alt);
@@ -249,31 +249,42 @@
     gap: 6px;
 }
 
-/* Context Badge (in toolbar) */
-.context-badge {
+/* Context Bar — thin strip below input (Kilo Code status-bar style) */
+.context-bar {
+    flex-shrink: 0;
+    padding: 3px 12px;
+    border-top: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary-alt);
+    min-height: 20px;
+}
+
+.context-bar-file {
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 4px 8px;
-    border-radius: 4px;
-    background: var(--background-primary);
-    border: 1px solid var(--background-modifier-border);
-    font-size: 12px;
-    color: var(--text-muted);
+    color: var(--text-faint);
+    font-size: 10px;
+    font-family: var(--font-interface);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 .context-icon {
     display: flex;
     align-items: center;
+    flex-shrink: 0;
 }
 
 .context-icon svg {
-    width: 14px;
-    height: 14px;
+    width: 10px;
+    height: 10px;
 }
 
 .context-label {
-    font-family: var(--font-interface);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* Toolbar Buttons */
@@ -392,29 +403,59 @@
     height: 16px;
 }
 
-/* Tool call display inline in messages */
-.tool-call {
+/* Tool call expandable details block (Feature 7) */
+.tool-call-details {
+    margin: 6px 0;
+    border-radius: 4px;
+    border: 1px solid var(--background-modifier-border);
+    border-left: 2px solid var(--interactive-accent);
+    background: var(--background-secondary-alt);
+    font-size: 12px;
+    overflow: hidden;
+}
+
+.tool-call-summary {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 8px;
-    margin: 4px 0;
-    background: var(--background-secondary-alt);
-    border-radius: 4px;
-    font-size: 12px;
+    padding: 5px 8px;
+    cursor: pointer;
     color: var(--text-muted);
-    border-left: 2px solid var(--interactive-accent);
+    list-style: none;
+    user-select: none;
 }
 
-.tool-call .tool-icon svg {
+.tool-call-summary::-webkit-details-marker {
+    display: none;
+}
+
+.tool-call-summary .tool-icon svg {
     width: 12px;
     height: 12px;
+    flex-shrink: 0;
 }
 
-.tool-call .tool-name {
+.tool-call-summary .tool-name {
     font-family: var(--font-monospace);
     font-weight: normal;
     margin-bottom: 0;
+    flex: 1;
+}
+
+.tool-call-input,
+.tool-call-output {
+    border-top: 1px solid var(--background-modifier-border);
+    padding: 6px 8px;
+}
+
+.tool-call-input pre,
+.tool-call-output pre {
+    margin: 0;
+    font-family: var(--font-monospace);
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: pre-wrap;
+    word-break: break-all;
 }
 
 .tool-status.tool-running {
@@ -430,7 +471,16 @@
     color: var(--color-red);
 }
 
-/* Error message in chat */
+/* Token usage footer (Feature 6) */
+.message-footer {
+    padding: 4px 12px 0;
+    font-size: 10px;
+    color: var(--text-faint);
+    font-family: var(--font-interface);
+    text-align: right;
+}
+
+/* Error message in chat (Feature 5) */
 .message-error {
     display: flex;
     align-items: flex-start;
@@ -446,7 +496,22 @@
     width: 16px;
     height: 16px;
     flex-shrink: 0;
-    margin-top: 1px;
+    margin-top: 2px;
+}
+
+.message-error .error-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.message-error .error-title {
+    font-weight: 600;
+}
+
+.message-error .error-detail {
+    font-size: 11px;
+    opacity: 0.8;
 }
 
 /* Markdown content reset for chat bubbles */

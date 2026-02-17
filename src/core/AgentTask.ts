@@ -24,6 +24,8 @@ export interface AgentTaskCallbacks {
     onToolStart: (name: string, input: Record<string, any>) => void;
     /** Called when a tool has finished executing */
     onToolResult: (name: string, content: string, isError: boolean) => void;
+    /** Called with cumulative token usage just before onComplete (Feature 6) */
+    onUsage?: (inputTokens: number, outputTokens: number) => void;
     /** Called when the task is complete */
     onComplete: () => void;
     /** Called when an unrecoverable error occurs */
@@ -77,6 +79,9 @@ export class AgentTask {
         history.push({ role: 'user', content: userMessage });
 
         const MAX_ITERATIONS = 10; // Prevent runaway loops
+        // Feature 6: Accumulate token usage across all iterations
+        let totalInputTokens = 0;
+        let totalOutputTokens = 0;
 
         try {
             for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
@@ -97,8 +102,11 @@ export class AgentTask {
                         });
                         // Notify UI that a tool is starting
                         this.taskCallbacks.onToolStart(chunk.name, chunk.input);
+                    } else if (chunk.type === 'usage') {
+                        // Feature 6: Accumulate tokens across all agentic iterations
+                        totalInputTokens += chunk.inputTokens;
+                        totalOutputTokens += chunk.outputTokens;
                     }
-                    // 'usage' chunks are informational - could log them
                 }
 
                 // Build the assistant message content
@@ -161,6 +169,10 @@ export class AgentTask {
                 history.push({ role: 'user', content: toolResultBlocks });
             }
 
+            // Feature 6: Report total token usage before completing
+            if (totalInputTokens > 0 || totalOutputTokens > 0) {
+                this.taskCallbacks.onUsage?.(totalInputTokens, totalOutputTokens);
+            }
             this.taskCallbacks.onComplete();
         } catch (error) {
             // AbortError is expected when user cancels — not a real error

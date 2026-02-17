@@ -23,6 +23,7 @@ export class AgentSidebarView extends ItemView {
     private modeButton: HTMLElement | null = null;
     private sendButton: HTMLElement | null = null;
     private stopButton: HTMLElement | null = null;
+    private contextBadgeContainer: HTMLElement | null = null;
 
     // Feature 1: Persistent conversation history (survives across messages)
     private conversationHistory: MessageParam[] = [];
@@ -55,6 +56,15 @@ export class AgentSidebarView extends ItemView {
         this.buildHeader(container);
         this.buildChatContainer(container);
         this.buildChatInput(container);
+        this.buildContextBar(container);
+
+        // Feature 4: Update context badge when user switches files
+        this.registerEvent(
+            this.app.workspace.on('active-leaf-change', () => this.updateContextBadge())
+        );
+        this.registerEvent(
+            this.app.workspace.on('file-open', () => this.updateContextBadge())
+        );
 
         if (this.plugin.settings.showWelcomeMessage) {
             this.showWelcomeMessage();
@@ -73,6 +83,17 @@ export class AgentSidebarView extends ItemView {
 
         const headerRight = header.createDiv('agent-header-right');
 
+        // Settings button — moved here from toolbar
+        const settingsBtn = headerRight.createEl('button', {
+            cls: 'header-button',
+            attr: { 'aria-label': 'Settings' },
+        });
+        setIcon(settingsBtn, 'settings');
+        settingsBtn.addEventListener('click', () => {
+            (this.app as any).setting?.open();
+            (this.app as any).setting?.openTabById('obsidian-agent');
+        });
+
         // New Chat button — clears conversation history
         const newChatBtn = headerRight.createEl('button', {
             cls: 'header-button',
@@ -80,9 +101,6 @@ export class AgentSidebarView extends ItemView {
         });
         setIcon(newChatBtn, 'square-pen');
         newChatBtn.addEventListener('click', () => this.clearConversation());
-
-        const meta = header.createDiv('agent-meta');
-        meta.setText(this.getModeDisplayName(this.plugin.settings.currentMode));
     }
 
     private buildChatContainer(container: HTMLElement): void {
@@ -108,9 +126,6 @@ export class AgentSidebarView extends ItemView {
         });
 
         const toolbar = inputWrapper.createDiv('chat-toolbar');
-        const toolbarLeft = toolbar.createDiv('chat-toolbar-left');
-        this.buildContextIndicator(toolbarLeft);
-
         const toolbarRight = toolbar.createDiv('chat-toolbar-right');
 
         // Mode button
@@ -120,18 +135,6 @@ export class AgentSidebarView extends ItemView {
         });
         this.updateModeButton();
         this.modeButton.addEventListener('click', (e) => this.showModeMenu(e));
-
-        // Settings button
-        const settingsBtn = toolbarRight.createEl('button', {
-            cls: 'toolbar-button',
-            attr: { 'aria-label': 'Settings' },
-        });
-        setIcon(settingsBtn.createSpan('toolbar-icon'), 'settings');
-        settingsBtn.addEventListener('click', () => {
-            // Open Obsidian settings at our tab
-            (this.app as any).setting?.open();
-            (this.app as any).setting?.openTabById('obsidian-agent');
-        });
 
         // Feature 3: Stop button (hidden by default, shown when task is running)
         this.stopButton = toolbarRight.createEl('button', {
@@ -151,12 +154,20 @@ export class AgentSidebarView extends ItemView {
         this.sendButton.addEventListener('click', () => this.handleSendMessage());
     }
 
-    private buildContextIndicator(container: HTMLElement): void {
+    private buildContextBar(container: HTMLElement): void {
+        // Feature 4: Thin context strip below chat messages (Kilo Code: status-bar style)
+        this.contextBadgeContainer = container.createDiv('context-bar');
+        this.updateContextBadge();
+    }
+
+    private updateContextBadge(): void {
+        if (!this.contextBadgeContainer) return;
+        this.contextBadgeContainer.empty();
         const activeFile = this.app.workspace.getActiveFile();
         if (activeFile) {
-            const indicator = container.createDiv('context-badge');
-            setIcon(indicator.createSpan('context-icon'), 'file-text');
-            indicator.createSpan('context-label').setText(activeFile.basename);
+            const inner = this.contextBadgeContainer.createDiv('context-bar-file');
+            setIcon(inner.createSpan('context-icon'), 'file-text');
+            inner.createSpan('context-label').setText(activeFile.path);
         }
     }
 
@@ -233,6 +244,13 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
         this.textarea.value = '';
         this.autoResizeTextarea();
 
+        // Feature 4: Inject active file context into the message sent to LLM
+        // User sees original text; LLM gets text + active file path as context
+        const activeFile = this.app.workspace.getActiveFile();
+        const messageToSend = activeFile
+            ? `${text}\n\n<context>\nActive file in editor: ${activeFile.path}\n</context>`
+            : text;
+
         if (!this.plugin.apiHandler) {
             this.addAssistantMessage(
                 'No LLM provider configured. Please add an API key in **Settings → Obsidian Agent**.'
@@ -245,7 +263,7 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
         this.setRunningState(true);
 
         // Prepare streaming message elements
-        const { messageEl, contentEl } = this.createStreamingMessageEl();
+        const { messageEl, contentEl, footerEl } = this.createStreamingMessageEl();
         let accumulatedText = '';
 
         const taskId = `task-${Date.now()}`;
@@ -268,26 +286,49 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
                     );
                     this.chatContainer?.scrollTo({ top: this.chatContainer.scrollHeight });
                 },
-                onToolStart: (name) => {
-                    const toolEl = messageEl.createDiv('tool-call');
-                    setIcon(toolEl.createSpan('tool-icon'), 'wrench');
-                    toolEl.createSpan('tool-name').setText(name);
-                    toolEl.createSpan('tool-status tool-running').setText('running...');
-                    // Store ref so we can update it in onToolResult
-                    (toolEl as any)._toolName = name;
+                onToolStart: (name, input) => {
+                    // Feature 7: Expandable tool call block (open while running)
+                    const details = messageEl.createEl('details', { cls: 'tool-call-details' });
+                    details.open = true;
+                    const summary = details.createEl('summary', { cls: 'tool-call-summary' });
+                    setIcon(summary.createSpan('tool-icon'), 'wrench');
+                    summary.createSpan('tool-name').setText(name);
+                    summary.createSpan('tool-status tool-running').setText('running…');
+
+                    // Input block
+                    const inputEl = details.createDiv('tool-call-input');
+                    inputEl.createEl('pre').setText(JSON.stringify(input, null, 2));
+
+                    // Placeholder for output (filled in onToolResult)
+                    details.createDiv('tool-call-output');
+
+                    (details as any)._toolName = name;
                 },
-                onToolResult: (name, _content, isError) => {
-                    // Find the tool-call div and update status
-                    messageEl.querySelectorAll('.tool-call').forEach((el) => {
-                        if ((el as any)._toolName === name) {
-                            const statusEl = el.querySelector('.tool-status');
-                            if (statusEl) {
-                                statusEl.removeClass('tool-running');
-                                statusEl.addClass(isError ? 'tool-error' : 'tool-done');
-                                statusEl.setText(isError ? 'error' : 'done');
-                            }
+                onToolResult: (name, content, isError) => {
+                    // Feature 7: Fill in output and update status
+                    messageEl.querySelectorAll('.tool-call-details').forEach((el) => {
+                        if ((el as any)._toolName !== name) return;
+                        const statusEl = el.querySelector('.tool-status');
+                        if (statusEl) {
+                            statusEl.removeClass('tool-running');
+                            statusEl.addClass(isError ? 'tool-error' : 'tool-done');
+                            statusEl.setText(isError ? 'error' : 'done');
                         }
+                        const outputEl = el.querySelector('.tool-call-output');
+                        if (outputEl && content) {
+                            const truncated = content.length > 500
+                                ? content.slice(0, 500) + '\n…(truncated)'
+                                : content;
+                            outputEl.createEl('pre').setText(truncated);
+                        }
+                        // Collapse when done (user can re-expand)
+                        (el as HTMLDetailsElement).open = isError;
                     });
+                },
+                // Feature 6: Show token usage in message footer
+                onUsage: (inputTokens, outputTokens) => {
+                    footerEl.setText(`${inputTokens.toLocaleString()} in · ${outputTokens.toLocaleString()} out`);
+                    footerEl.style.display = '';
                 },
                 onComplete: () => {
                     messageEl.removeClass('message-streaming');
@@ -295,11 +336,14 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
                     this.setRunningState(false);
                     this.chatContainer?.scrollTo({ top: this.chatContainer.scrollHeight });
                 },
+                // Feature 5: Styled error display with friendly messages
                 onError: (error) => {
                     contentEl.empty();
                     const errEl = messageEl.createDiv('message-error');
                     setIcon(errEl.createSpan('error-icon'), 'alert-triangle');
-                    errEl.createSpan('error-text').setText(error.message);
+                    const errBody = errEl.createDiv('error-body');
+                    errBody.createDiv('error-title').setText(this.getErrorTitle(error));
+                    errBody.createDiv('error-detail').setText(error.message);
                     messageEl.removeClass('message-streaming');
                     this.currentAbortController = null;
                     this.setRunningState(false);
@@ -308,7 +352,8 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
         );
 
         // Feature 1: Pass the shared history — it accumulates across messages
-        await task.run(text, taskId, mode, this.conversationHistory, this.currentAbortController.signal);
+        // Feature 4: Pass messageToSend (with active file context) instead of raw text
+        await task.run(messageToSend, taskId, mode, this.conversationHistory, this.currentAbortController.signal);
     }
 
     /**
@@ -343,14 +388,38 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
     }
 
     /**
-     * Create the streaming message container
+     * Create the streaming message container with footer for token usage (Feature 6)
      */
-    private createStreamingMessageEl(): { messageEl: HTMLElement; contentEl: HTMLElement } {
+    private createStreamingMessageEl(): { messageEl: HTMLElement; contentEl: HTMLElement; footerEl: HTMLElement } {
         if (!this.chatContainer) throw new Error('Chat container not initialized');
         const messageEl = this.chatContainer.createDiv('message assistant-message message-streaming');
         const contentEl = messageEl.createDiv('message-content');
+        // Feature 6: Token usage footer (hidden until onUsage fires)
+        const footerEl = messageEl.createDiv('message-footer');
+        footerEl.style.display = 'none';
         this.chatContainer.scrollTo({ top: this.chatContainer.scrollHeight });
-        return { messageEl, contentEl };
+        return { messageEl, contentEl, footerEl };
+    }
+
+    /**
+     * Feature 5: Map API error to a friendly title
+     */
+    private getErrorTitle(error: Error): string {
+        const msg = error.message.toLowerCase();
+        const status = (error as any).status ?? (error as any).statusCode;
+        if (status === 401 || msg.includes('api key') || msg.includes('authentication')) {
+            return 'Invalid API key — check Settings → Obsidian Agent';
+        }
+        if (status === 429 || msg.includes('rate limit')) {
+            return 'Rate limit reached — please wait a moment';
+        }
+        if (status === 529 || msg.includes('overload')) {
+            return 'API overloaded — try again shortly';
+        }
+        if (msg.includes('network') || msg.includes('fetch') || msg.includes('econnrefused')) {
+            return 'Network error — check your internet connection';
+        }
+        return 'Error';
     }
 
     /**
@@ -379,7 +448,5 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
         this.plugin.settings.currentMode = modeId;
         this.plugin.saveSettings();
         this.updateModeButton();
-        const meta = this.containerEl.querySelector('.agent-meta');
-        if (meta) meta.setText(this.getModeDisplayName(modeId));
     }
 }
