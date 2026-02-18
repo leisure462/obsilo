@@ -1,0 +1,77 @@
+/**
+ * UseMcpToolTool — bridge from LLM tool calls to the MCP client.
+ *
+ * The LLM calls: use_mcp_tool(server_name, tool_name, arguments)
+ * This tool forwards the call to the connected McpClient instance.
+ */
+
+import { BaseTool } from '../BaseTool';
+import type { ToolDefinition, ToolExecutionContext } from '../types';
+import type ObsidianAgentPlugin from '../../../main';
+import type { McpClient } from '../../mcp/McpClient';
+
+interface UseMcpToolInput {
+    server_name: string;
+    tool_name: string;
+    arguments?: Record<string, unknown>;
+}
+
+export class UseMcpToolTool extends BaseTool<'use_mcp_tool'> {
+    readonly name = 'use_mcp_tool' as const;
+    readonly isWriteOperation = false;
+
+    private mcpClient: McpClient;
+
+    constructor(plugin: ObsidianAgentPlugin, mcpClient: McpClient) {
+        super(plugin);
+        this.mcpClient = mcpClient;
+    }
+
+    getDefinition(): ToolDefinition {
+        return {
+            name: 'use_mcp_tool',
+            description:
+                'Call a tool on a connected MCP (Model Context Protocol) server. ' +
+                'Use this to access external tools and data sources configured in Settings → MCP.',
+            input_schema: {
+                type: 'object',
+                properties: {
+                    server_name: {
+                        type: 'string',
+                        description: 'The name of the MCP server to call (as configured in Settings).',
+                    },
+                    tool_name: {
+                        type: 'string',
+                        description: 'The name of the tool to invoke on the server.',
+                    },
+                    arguments: {
+                        type: 'object',
+                        description: 'Arguments to pass to the tool. Must match the tool\'s input schema.',
+                    },
+                },
+                required: ['server_name', 'tool_name'],
+            },
+        };
+    }
+
+    async execute(input: Record<string, any>, context: ToolExecutionContext): Promise<void> {
+        const { server_name, tool_name, arguments: args = {} } = input as UseMcpToolInput;
+        const { callbacks } = context;
+
+        if (!server_name || !tool_name) {
+            callbacks.pushToolResult(
+                this.formatError(new Error('server_name and tool_name are required'))
+            );
+            return;
+        }
+
+        try {
+            const result = await this.mcpClient.callTool(server_name, tool_name, args as Record<string, unknown>);
+            callbacks.pushToolResult(result);
+            callbacks.log(`MCP tool ${server_name}/${tool_name} returned ${result.length} chars`);
+        } catch (error) {
+            callbacks.pushToolResult(this.formatError(error));
+            await callbacks.handleError('use_mcp_tool', error);
+        }
+    }
+}

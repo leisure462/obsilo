@@ -6,6 +6,7 @@ import { ModeService } from '../core/modes/ModeService';
 import type { MessageParam, ContentBlock, ImageMediaType } from '../api/types';
 import { getModelKey, modelToLLMProvider } from '../types/settings';
 import { buildApiHandler } from '../api/index';
+import { resolvePromptContent } from '../core/context/SupportPrompts';
 
 export const VIEW_TYPE_AGENT_SIDEBAR = 'obsidian-agent-sidebar';
 
@@ -712,8 +713,14 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
                             details.open = true;
                             activeToolGroup = { name, detailsEl: details, nameEl, statusEl, bodyEl, count: 1 };
                         } else {
+                            // Group already exists from a previous iteration — reopen it and
+                            // reset status to "running" so the user sees the new work arriving.
                             activeToolGroup.count++;
                             activeToolGroup.nameEl.setText(this.formatGroupedLabel(name, activeToolGroup.count));
+                            activeToolGroup.detailsEl.open = true;
+                            activeToolGroup.statusEl.removeClass('tool-done', 'tool-error');
+                            activeToolGroup.statusEl.addClass('tool-running');
+                            activeToolGroup.statusEl.setText('');
                         }
 
                         // Add compact item row to group body
@@ -783,7 +790,9 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
                                     groupStatus.addClass(anyError ? 'tool-error' : 'tool-done');
                                     groupStatus.setText(anyError ? '✗' : '✓');
                                 }
-                                detailsEl.open = isError;
+                                // Keep group open so the user can see which files were processed.
+                                // Only collapse on error so the user can inspect failures.
+                                if (isError) detailsEl.open = false;
                             }
                         }
 
@@ -879,6 +888,9 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
                         const allDone = lastTodoItems.map((i) => ({ ...i, status: 'done' as const }));
                         this.renderTodoBox(toolsEl, allDone);
                     }
+                    // Refresh mode button — ensures it always reflects the final active mode
+                    // even after an agent-initiated switch_mode call during this task.
+                    this.updateModeButton();
                     // Replace the raw streaming text with the properly formatted Markdown.
                     // This fires exactly once — giving us instant streaming + clean final output.
                     streamingPara = null;
@@ -974,6 +986,7 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
             this.plugin.settings.includeCurrentTimeInContext ?? true,
             rulesContent || undefined,
             skillsSection || undefined,
+            this.plugin.mcpClient,
         );
     }
 
@@ -1189,28 +1202,55 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
         if (!this.textarea) return;
         const value = this.textarea.value;
 
-        // / at the very start → workflow autocomplete
+        // / at the very start → workflow + prompt autocomplete
         if (value.startsWith('/')) {
             const query = value.slice(1).split(' ')[0].toLowerCase();
+
+            // Workflows
             const workflowLoader = (this.plugin as any).workflowLoader;
-            if (!workflowLoader) { this.hideAutocompleteDropdown(); return; }
-            const workflows: { slug: string; displayName: string }[] = await workflowLoader.discoverWorkflows();
-            const filtered = workflows.filter((w: { slug: string }) =>
-                query === '' || w.slug.startsWith(query)
-            );
-            if (filtered.length === 0) { this.hideAutocompleteDropdown(); return; }
-            this.autocompleteItems = filtered.map((w: { slug: string; displayName: string }) => ({
-                label: w.displayName,
-                sub: `/${w.slug}`,
-                onSelect: () => {
-                    if (!this.textarea) return;
-                    // Replace the /query with /slug + space so handleSendMessage can expand it
-                    const rest = value.includes(' ') ? value.slice(value.indexOf(' ') + 1) : '';
-                    this.textarea.value = `/${w.slug}${rest ? ' ' + rest : ''}`;
-                    this.hideAutocompleteDropdown();
-                    this.textarea.focus();
-                },
-            }));
+            const workflows: { slug: string; displayName: string }[] = workflowLoader
+                ? await workflowLoader.discoverWorkflows()
+                : [];
+            const workflowItems = workflows
+                .filter((w) => query === '' || w.slug.startsWith(query))
+                .map((w) => ({
+                    label: w.displayName,
+                    sub: `/${w.slug}`,
+                    onSelect: () => {
+                        if (!this.textarea) return;
+                        const rest = value.includes(' ') ? value.slice(value.indexOf(' ') + 1) : '';
+                        this.textarea.value = `/${w.slug}${rest ? ' ' + rest : ''}`;
+                        this.hideAutocompleteDropdown();
+                        this.textarea.focus();
+                    },
+                }));
+
+            // Helper: replace textarea with resolved prompt template
+            const makePromptSelector = (content: string) => () => {
+                if (!this.textarea) return;
+                const userInput = value.includes(' ') ? value.slice(value.indexOf(' ') + 1) : '';
+                const activeFile = this.app.workspace.getActiveFile()?.name;
+                this.textarea.value = resolvePromptContent(content, { userInput, activeFile });
+                this.hideAutocompleteDropdown();
+                this.textarea.focus();
+            };
+
+            // User-defined custom prompts — filtered by enabled flag, slug query, and optional mode
+            const activeMode = this.plugin.settings.currentMode;
+            const customItems = (this.plugin.settings.customPrompts ?? [])
+                .filter((p) =>
+                    p.enabled !== false &&
+                    (query === '' || p.slug.startsWith(query)) &&
+                    (!p.mode || p.mode === activeMode)
+                )
+                .map((p) => ({
+                    label: p.name,
+                    sub: `/${p.slug}`,
+                    onSelect: makePromptSelector(p.content),
+                }));
+
+            this.autocompleteItems = [...workflowItems, ...customItems];
+            if (this.autocompleteItems.length === 0) { this.hideAutocompleteDropdown(); return; }
             this.autocompleteIndex = 0;
             this.renderAutocompleteDropdown();
             return;

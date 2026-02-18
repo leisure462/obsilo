@@ -2668,3 +2668,126 @@
 }
 
 .approve-edit-reject { color: var(--color-red); }
+
+/* ─── MCP Settings Tab ─────────────────────────────────────────── */
+
+.agent-mcp-add-btn { margin-bottom: 12px; }
+
+.agent-mcp-list { display: flex; flex-direction: column; gap: 4px; }
+
+.agent-mcp-server-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--background-modifier-border);
+}
+
+.agent-mcp-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.agent-mcp-status-dot.connected    { background: var(--color-green); }
+.agent-mcp-status-dot.disconnected { background: var(--text-faint); }
+.agent-mcp-status-dot.error        { background: var(--color-red); }
+.agent-mcp-status-dot.connecting   { background: var(--color-yellow); }
+
+.agent-mcp-server-info {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.agent-mcp-server-name  { font-weight: 600; }
+.agent-mcp-server-type  { color: var(--text-muted); font-size: var(--font-smaller); }
+.agent-mcp-server-tools { color: var(--text-muted); font-size: var(--font-smaller); }
+.agent-mcp-server-error {
+    color: var(--color-red);
+    font-size: var(--font-smaller);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* MCP Add/Edit modal */
+.agent-mcp-modal-input {
+    width: 100%;
+    margin: 4px 0 12px;
+    padding: 4px 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-secondary);
+    color: var(--text-normal);
+    font-family: var(--font-monospace);
+    font-size: var(--font-smaller);
+    box-sizing: border-box;
+}
+.agent-mcp-section { margin-bottom: 8px; }
+.agent-mcp-modal-save { margin-top: 8px; }
+
+/* ─── Custom Prompts Tab ───────────────────────────────────────── */
+
+.agent-prompt-builtin-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+
+.agent-prompt-builtin-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+.agent-prompt-builtin-name  { font-weight: 600; min-width: 130px; }
+.agent-prompt-builtin-desc  { color: var(--text-muted); font-size: var(--font-smaller); }
+
+.agent-prompt-form {
+    padding: 12px;
+    margin-bottom: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-secondary);
+}
+.agent-prompt-form-title { font-weight: 600; margin: 0 0 8px; }
+.agent-prompt-input {
+    display: block;
+    width: 100%;
+    margin-bottom: 8px;
+    padding: 4px 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-primary);
+    color: var(--text-normal);
+    box-sizing: border-box;
+}
+.agent-prompt-textarea {
+    display: block;
+    width: 100%;
+    margin-bottom: 8px;
+    padding: 4px 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-primary);
+    color: var(--text-normal);
+    font-family: var(--font-monospace);
+    font-size: var(--font-smaller);
+    resize: vertical;
+    box-sizing: border-box;
+}
+.agent-prompt-form-btns { display: flex; gap: 8px; }
+.agent-prompt-add-btn   { margin-bottom: 12px; }
+.agent-prompt-mode-row  { display: flex; align-items: flex-start; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.agent-prompt-mode-label { font-size: var(--font-smaller); color: var(--text-muted); }
+.agent-prompt-mode-select { width: 100%; }
+.agent-prompt-mode-badge {
+    display: inline-block;
+    font-size: var(--font-smaller);
+    color: var(--text-on-accent);
+    background: var(--interactive-accent);
+    border-radius: 3px;
+    padding: 1px 5px;
+    margin-left: 4px;
+    vertical-align: middle;
+}

@@ -152,6 +152,25 @@ export function modelToLLMProvider(model: CustomModel): LLMProvider {
 }
 
 // ---------------------------------------------------------------------------
+// Custom Prompts — user-defined slash-command prompt templates
+// ---------------------------------------------------------------------------
+
+export interface CustomPrompt {
+    /** Unique identifier */
+    id: string;
+    /** Display name, e.g. "Tagesbericht" */
+    name: string;
+    /** Slash-command trigger, e.g. "daily-report" → /daily-report */
+    slug: string;
+    /** Template text — supports {{userInput}} and {{activeFile}} variables */
+    content: string;
+    /** Whether this prompt appears in autocomplete */
+    enabled: boolean;
+    /** Optional: restrict this prompt to a specific mode slug. If unset, appears in all modes. */
+    mode?: string;
+}
+
+// ---------------------------------------------------------------------------
 // MCP Server configuration
 // ---------------------------------------------------------------------------
 
@@ -346,6 +365,9 @@ export interface ObsidianAgentSettings {
     // Workflows (Sprint 3.3) — per-file enabled/disabled toggles
     workflowToggles: Record<string, boolean>;
 
+    // Custom Prompts — user-defined slash-command templates
+    customPrompts: CustomPrompt[];
+
     // Advanced
     debugMode: boolean;
 }
@@ -421,5 +443,6 @@ export const DEFAULT_SETTINGS: ObsidianAgentSettings = {
     includeCurrentTimeInContext: true,
     rulesToggles: {},
     workflowToggles: {},
+    customPrompts: [],
     debugMode: false,
 };

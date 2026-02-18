@@ -14,6 +14,7 @@
 
 import type { ModeConfig, ToolGroup } from '../types/settings';
 import { BUILT_IN_MODES, expandToolGroups } from './modes/builtinModes';
+import type { McpClient } from './mcp/McpClient';
 
 // ---------------------------------------------------------------------------
 // Vault context (always included)
@@ -102,7 +103,8 @@ const TOOL_DECISION_GUIDELINES = `Tool decision guidelines:
 2. Only call read_file for a file whose content is NOT already in the conversation. If you already read a file earlier in this session, do not read it again unless you need to verify changes.
 3. Choose the minimal tool path. If a single search_files call answers the question, don't also list_files and read every result. Prefer the shortest route to the correct answer.
 4. Do not call tools "just in case". Only call a tool when you genuinely need its result to continue.
-5. For orientation (first time seeing the vault), one get_vault_stats call is enough. Do not follow it with list_files on every folder unless the task requires it.`;
+5. For orientation (first time seeing the vault), one get_vault_stats call is enough. Do not follow it with list_files on every folder unless the task requires it.
+6. Prefer semantic_search over search_files when looking for notes by topic or concept. The Semantic Index finds conceptually related content even when exact keywords differ — use it before reading individual files.`;
 
 // ---------------------------------------------------------------------------
 // Response format (always included)
@@ -141,6 +143,7 @@ export function buildSystemPromptForMode(
     includeTime?: boolean,
     rulesContent?: string,
     skillsSection?: string,
+    mcpClient?: McpClient,
 ): string {
     // Date/time header — placed at the very top so the model always uses the correct date.
     // Uses the Mac system clock via new Date(). Locale is fixed to en-US so the LLM
@@ -166,10 +169,26 @@ export function buildSystemPromptForMode(
     // Add tool sections for this mode's groups
     const groupOrder: ToolGroup[] = ['read', 'vault', 'edit', 'web', 'agent', 'mcp'];
     for (const group of groupOrder) {
-        if (mode.toolGroups.includes(group)) {
+        if (!mode.toolGroups.includes(group)) continue;
+        if (group === 'mcp' && mcpClient) {
+            // Inject dynamic list of connected MCP server tools
+            const allMcpTools = mcpClient.getAllTools();
+            if (allMcpTools.length > 0) {
+                const toolLines = allMcpTools.map(({ serverName, tool }) =>
+                    `  - ${serverName}: ${tool.name}${tool.description ? ' — ' + tool.description : ''}`
+                ).join('\n');
+                sections.push(
+                    `**MCP Tools (via use_mcp_tool):**\n` +
+                    `- use_mcp_tool(server_name, tool_name, arguments): Call a tool on a connected MCP server.\n\n` +
+                    `Connected servers and their tools:\n${toolLines}`
+                );
+            } else {
+                sections.push(TOOL_SECTIONS[group]);
+            }
+        } else {
             sections.push(TOOL_SECTIONS[group]);
-            sections.push('');
         }
+        sections.push('');
     }
 
     sections.push(TOOL_RULES);

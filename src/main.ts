@@ -13,6 +13,7 @@ import { SkillsManager } from './core/context/SkillsManager';
 import { GitCheckpointService } from './core/checkpoints/GitCheckpointService';
 import { SemanticIndexService } from './core/semantic/SemanticIndexService';
 import { ChatHistoryService } from './core/ChatHistoryService';
+import { McpClient } from './core/mcp/McpClient';
 import { buildApiHandler } from './api/index';
 import type { ApiHandler } from './api/types';
 import type { ToolUse, ToolCallbacks } from './core/tools/types';
@@ -45,6 +46,7 @@ export default class ObsidianAgentPlugin extends Plugin {
     skillsManager: SkillsManager;
     semanticIndex: SemanticIndexService | null = null;
     chatHistoryService: ChatHistoryService | null = null;
+    mcpClient: McpClient;
 
     /**
      * Plugin initialization
@@ -119,8 +121,16 @@ export default class ObsidianAgentPlugin extends Plugin {
             );
         }
 
+        // MCP Client — connect to all configured servers
+        this.mcpClient = new McpClient();
+        if (Object.keys(this.settings.mcpServers ?? {}).length > 0) {
+            this.mcpClient.connectAll(this.settings.mcpServers).catch((e) =>
+                console.warn('[Plugin] MCP connect failed (non-fatal):', e)
+            );
+        }
+
         // Tool registry (ToolExecutionPipeline created per-task)
-        this.toolRegistry = new ToolRegistry(this);
+        this.toolRegistry = new ToolRegistry(this, this.mcpClient);
 
         // Semantic index (Phase C2) — lazy build, only when enabled
         if (this.settings.enableSemanticIndex) {
@@ -192,13 +202,7 @@ export default class ObsidianAgentPlugin extends Plugin {
      */
     async onunload() {
         console.log('Unloading Obsidian Agent plugin');
-
-        // Dispose of services
-        // TODO: Uncomment when services are implemented
-        // await this.mcpHub.dispose();
-        // await this.semanticIndex.dispose();
-        // this.provider.dispose();
-
+        await this.mcpClient?.disconnectAll();
         console.log('Obsidian Agent plugin unloaded');
     }
 
@@ -260,6 +264,14 @@ export default class ObsidianAgentPlugin extends Plugin {
     async saveSettings() {
         await this.saveData(this.settings);
         this.initApiHandler();
+    }
+
+    /** Reconnect all MCP servers from current settings. Called when MCP config changes. */
+    async reconnectMcp(): Promise<void> {
+        await this.mcpClient.disconnectAll();
+        if (Object.keys(this.settings.mcpServers ?? {}).length > 0) {
+            await this.mcpClient.connectAll(this.settings.mcpServers);
+        }
     }
 
     /**

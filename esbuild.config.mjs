@@ -42,22 +42,34 @@ const context = await esbuild.context({
     sourcemap: prod ? false : "inline",
     treeShaking: true,
     outfile: "main.js",
-    plugins: [{
-        name: "vault-deploy",
-        setup(build) {
-            build.onEnd(() => {
-                if (existsSync(VAULT_PLUGIN_DIR)) {
-                    try {
-                        copyFileSync("main.js", `${VAULT_PLUGIN_DIR}/main.js`);
-                        copyFileSync("styles.css", `${VAULT_PLUGIN_DIR}/styles.css`);
-                        console.log(`[vault-deploy] → ${VAULT_PLUGIN_DIR}`);
-                    } catch (e) {
-                        console.warn("[vault-deploy] Copy failed:", e.message);
+    plugins: [
+        {
+            // Resolve "node:xyz" imports → mark them external (Electron provides them)
+            name: "node-builtins",
+            setup(build) {
+                build.onResolve({ filter: /^node:/ }, (args) => ({
+                    path: args.path,
+                    external: true,
+                }));
+            }
+        },
+        {
+            name: "vault-deploy",
+            setup(build) {
+                build.onEnd(() => {
+                    if (existsSync(VAULT_PLUGIN_DIR)) {
+                        try {
+                            copyFileSync("main.js", `${VAULT_PLUGIN_DIR}/main.js`);
+                            copyFileSync("styles.css", `${VAULT_PLUGIN_DIR}/styles.css`);
+                            console.log(`[vault-deploy] → ${VAULT_PLUGIN_DIR}`);
+                        } catch (e) {
+                            console.warn("[vault-deploy] Copy failed:", e.message);
+                        }
                     }
-                }
-            });
+                });
+            }
         }
-    }],
+    ],
 });
 
 if (prod) {

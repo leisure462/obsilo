@@ -18,6 +18,7 @@ import { ToolExecutionPipeline } from './tool-execution/ToolExecutionPipeline';
 import { buildSystemPromptForMode } from './systemPrompt';
 import type { ModeService } from './modes/ModeService';
 import type { ModeConfig } from '../types/settings';
+import type { McpClient } from './mcp/McpClient';
 
 export interface AgentTaskCallbacks {
     /** Called at the start of each agentic loop iteration (0 = first/user message, 1+ = after tools) */
@@ -111,6 +112,7 @@ export class AgentTask {
         includeTime?: boolean,
         rulesContent?: string,
         skillsSection?: string,
+        mcpClient?: McpClient,
     ): Promise<void> {
         // Resolve mode to ModeConfig
         let activeMode: ModeConfig = this.resolveMode(initialMode);
@@ -207,7 +209,7 @@ export class AgentTask {
 
         const rebuildPromptCache = () => {
             const allModes = this.modeService?.getAllModes();
-            cachedSystemPrompt = buildSystemPromptForMode(activeMode, allModes, globalCustomInstructions, includeTime, rulesContent, skillsSection);
+            cachedSystemPrompt = buildSystemPromptForMode(activeMode, allModes, globalCustomInstructions, includeTime, rulesContent, skillsSection, mcpClient);
             cachedTools = this.modeService
                 ? this.modeService.getToolDefinitions(activeMode)
                 : this.toolRegistry.getToolDefinitions();

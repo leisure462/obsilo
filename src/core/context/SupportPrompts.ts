@@ -61,3 +61,43 @@ export const SUPPORT_PROMPT_LABELS: Record<SupportPromptType, string> = {
     EXPLAIN:   'Explain note',
     FIX:       'Fix issues',
 };
+
+// ---------------------------------------------------------------------------
+// Unified prompt entry for autocomplete + settings display
+// ---------------------------------------------------------------------------
+
+export interface PromptEntry {
+    id: string;
+    name: string;
+    /** Slash-command trigger without the leading slash, e.g. "enhance" */
+    slug: string;
+    /** Raw template text — variables not yet substituted */
+    content: string;
+    isBuiltIn: boolean;
+}
+
+/** Returns the four built-in templates as PromptEntry objects. */
+export function getBuiltInPromptEntries(): PromptEntry[] {
+    return (Object.keys(SUPPORT_PROMPT_LABELS) as SupportPromptType[]).map((type) => ({
+        id: `builtin-${type.toLowerCase()}`,
+        name: SUPPORT_PROMPT_LABELS[type],
+        slug: type.toLowerCase(),
+        content: TEMPLATES[type],
+        isBuiltIn: true,
+    }));
+}
+
+/**
+ * Resolve template variables in a prompt template.
+ * Handles both built-in syntax (${userInput}, ${activeFileHint})
+ * and user-friendly syntax ({{userInput}}, {{activeFile}}).
+ */
+export function resolvePromptContent(content: string, params: SupportPromptParams): string {
+    const activeFileHint = params.activeFile ? ` (active file: ${params.activeFile})` : '';
+    return content
+        .replace(/\{\{userInput\}\}/g, params.userInput ?? '')
+        .replace(/\{\{activeFile\}\}/g, params.activeFile ?? '')
+        .replace(/\$\{userInput\}/g, params.userInput ?? '')
+        .replace(/\$\{activeFileHint\}/g, activeFileHint)
+        .trim();
+}

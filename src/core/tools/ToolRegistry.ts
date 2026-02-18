@@ -47,15 +47,21 @@ import { AttemptCompletionTool } from './agent/AttemptCompletionTool';
 import { UpdateTodoListTool } from './agent/UpdateTodoListTool';
 import { SwitchModeTool } from './agent/SwitchModeTool';
 import { NewTaskTool } from './agent/NewTaskTool';
+// MCP tool
+import { UseMcpToolTool } from './mcp/UseMcpToolTool';
+import type { McpClient } from '../mcp/McpClient';
 
 export class ToolRegistry {
     private tools: Map<ToolName, BaseTool>;
     private plugin: ObsidianAgentPlugin;
 
-    constructor(plugin: ObsidianAgentPlugin) {
+    constructor(plugin: ObsidianAgentPlugin, mcpClient?: McpClient) {
         this.plugin = plugin;
         this.tools = new Map();
         this.registerInternalTools();
+        if (mcpClient) {
+            this.register(new UseMcpToolTool(this.plugin, mcpClient));
+        }
     }
 
     /**
