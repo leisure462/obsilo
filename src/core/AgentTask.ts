@@ -13,7 +13,7 @@
 
 import type { ApiHandler, MessageParam, ContentBlock } from '../api/types';
 import type { ToolRegistry } from './tools/ToolRegistry';
-import type { ToolCallbacks, ToolUse } from './tools/types';
+import type { ToolCallbacks, ToolUse, ToolDefinition } from './tools/types';
 import { ToolExecutionPipeline } from './tool-execution/ToolExecutionPipeline';
 import { buildSystemPromptForMode } from './systemPrompt';
 import type { ModeService } from './modes/ModeService';
@@ -83,6 +83,7 @@ export class AgentTask {
         history: MessageParam[],
         abortSignal?: AbortSignal,
         globalCustomInstructions?: string,
+        includeTime?: boolean,
     ): Promise<void> {
         // Resolve mode to ModeConfig
         let activeMode: ModeConfig = this.resolveMode(initialMode);
@@ -124,6 +125,22 @@ export class AgentTask {
             pendingModeSwitch = slug;
         };
 
+        // Cache system prompt + tool definitions — rebuilt only when the mode changes.
+        // Without this, buildSystemPromptForMode() and getToolDefinitions() are called
+        // on every agentic loop iteration even though nothing has changed.
+        let cachedPromptMode = '';
+        let cachedSystemPrompt = '';
+        let cachedTools: ToolDefinition[] = [];
+
+        const rebuildPromptCache = () => {
+            const allModes = this.modeService?.getAllModes();
+            cachedSystemPrompt = buildSystemPromptForMode(activeMode, allModes, globalCustomInstructions, includeTime);
+            cachedTools = this.modeService
+                ? this.modeService.getToolDefinitions(activeMode)
+                : this.toolRegistry.getToolDefinitions();
+            cachedPromptMode = activeMode.slug;
+        };
+
         try {
             for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
                 // Apply any pending mode switch at the start of each iteration
@@ -141,12 +158,12 @@ export class AgentTask {
 
                 this.taskCallbacks.onIterationStart?.(iteration);
 
-                // Build system prompt and tools for current mode
-                const allModes = this.modeService?.getAllModes();
-                const systemPrompt = buildSystemPromptForMode(activeMode, allModes, globalCustomInstructions);
-                const tools = this.modeService
-                    ? this.modeService.getToolDefinitions(activeMode)
-                    : this.toolRegistry.getToolDefinitions();
+                // Rebuild system prompt + tool list only when mode has changed
+                if (activeMode.slug !== cachedPromptMode) {
+                    rebuildPromptCache();
+                }
+                const systemPrompt = cachedSystemPrompt;
+                const tools = cachedTools;
 
                 const toolUses: ContentBlock[] = [];
                 const textParts: string[] = [];

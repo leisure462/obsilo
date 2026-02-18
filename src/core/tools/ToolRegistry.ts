@@ -92,7 +92,6 @@ export class ToolRegistry {
             console.warn(`ToolRegistry: Tool '${tool.name}' already registered, overwriting`);
         }
         this.tools.set(tool.name, tool);
-        console.log(`ToolRegistry: Registered tool '${tool.name}'`);
     }
 
     /**

@@ -42,12 +42,19 @@ export class ModeService {
     /**
      * All available modes (excl. __custom instruction entries):
      * built-in → global → vault
+     *
+     * Vault entries with a slug matching a built-in are treated as overrides:
+     * the vault version REPLACES the built-in in the returned list so that
+     * user customisations are visible to the agent loop.
      */
     getAllModes(): ModeConfig[] {
         const vault = this.plugin.settings.customModes.filter(
             (m) => !m.slug.endsWith('__custom'),
         );
-        return [...BUILT_IN_MODES, ...this.globalModes, ...vault];
+        // Vault overrides of built-in slugs take priority over the built-in definition
+        const overriddenSlugs = new Set(vault.map((m) => m.slug));
+        const effectiveBuiltIns = BUILT_IN_MODES.filter((m) => !overriddenSlugs.has(m.slug));
+        return [...effectiveBuiltIns, ...this.globalModes, ...vault];
     }
 
     /** Vault-only custom modes (source === 'vault'). */

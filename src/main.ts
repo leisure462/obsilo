@@ -1,6 +1,6 @@
 import { Plugin, WorkspaceLeaf, Notice, addIcon } from 'obsidian';
 import { ObsidianAgentSettings, DEFAULT_SETTINGS, getModelKey, modelToLLMProvider } from './types/settings';
-import type { CustomModel } from './types/settings';
+import type { CustomModel, AutoApprovalConfig } from './types/settings';
 import { AgentSidebarView, VIEW_TYPE_AGENT_SIDEBAR } from './ui/AgentSidebarView';
 import { AgentSettingsTab } from './ui/AgentSettingsTab';
 import { ToolRegistry } from './core/tools/ToolRegistry';
@@ -177,6 +177,17 @@ export default class ObsidianAgentPlugin extends Plugin {
         const advApi = this.settings.advancedApi as unknown as Record<string, unknown>;
         if ('useCustomTemperature' in advApi) delete advApi['useCustomTemperature'];
         if ('temperature' in advApi) delete advApi['temperature'];
+        // Migrate: autoApproval.write split into noteEdits + vaultChanges
+        const ap = this.settings.autoApproval as AutoApprovalConfig & { write?: boolean };
+        if (ap.write !== undefined) {
+            if (ap.noteEdits === undefined || ap.noteEdits === false) ap.noteEdits = ap.write;
+            if (ap.vaultChanges === undefined || ap.vaultChanges === false) ap.vaultChanges = ap.write;
+            delete ap.write;
+        }
+        // Ensure new fields exist for users upgrading from older versions
+        ap.noteEdits = ap.noteEdits ?? false;
+        ap.vaultChanges = ap.vaultChanges ?? false;
+        ap.skills = ap.skills ?? false;
     }
 
     /** Return the currently active CustomModel, or null if none configured */
@@ -221,6 +232,25 @@ export default class ObsidianAgentPlugin extends Plugin {
         try {
             this.apiHandler = buildApiHandler(modelToLLMProvider(model));
             console.log(`[Plugin] API handler initialized: ${model.displayName ?? model.name} (${model.provider})`);
+
+            // Pre-warm the DNS + TLS connection so the FIRST user message isn't delayed
+            // by cold-start network setup (~5-18 s on some systems / networks).
+            // We fire a lightweight HEAD to the provider base URL immediately after the
+            // handler is created.  The server will return an error (no valid payload),
+            // but the TCP/TLS connection is established and Chromium caches it for reuse.
+            // Local providers (ollama, lmstudio) are intentionally skipped.
+            const CLOUD_BASE_URLS: Partial<Record<string, string>> = {
+                anthropic:  'https://api.anthropic.com',
+                openai:     'https://api.openai.com',
+                openrouter: 'https://openrouter.ai',
+                azure:      model.baseUrl ?? '',
+                custom:     model.baseUrl ?? '',
+            };
+            const warmupUrl = CLOUD_BASE_URLS[model.provider];
+            if (warmupUrl) {
+                fetch(warmupUrl, { method: 'HEAD', signal: AbortSignal.timeout(8000) })
+                    .catch(() => { /* expected — we only want the TCP/TLS handshake */ });
+            }
         } catch (error) {
             console.error('[Plugin] Failed to initialize API handler:', error);
             this.apiHandler = null;

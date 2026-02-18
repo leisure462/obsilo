@@ -210,8 +210,15 @@ export interface AutoApprovalConfig {
     showMenuInChat: boolean;
     /** Auto-approve read operations (read_file, list_files, search_files, ...) */
     read: boolean;
-    /** Auto-approve write operations (write_file, edit_file, append_to_file, delete_file, move_file, ...) */
-    write: boolean;
+    /**
+     * @deprecated — migrated to noteEdits + vaultChanges.
+     * Kept as optional for the migration pass in loadSettings().
+     */
+    write?: boolean;
+    /** Auto-approve note content changes (write_file, edit_file, append_to_file, update_frontmatter) */
+    noteEdits: boolean;
+    /** Auto-approve vault structural changes (create_folder, delete_file, move_file) */
+    vaultChanges: boolean;
     /** Auto-approve web operations (web_fetch, web_search) */
     web: boolean;
     /** Auto-approve MCP tool calls */
@@ -224,6 +231,8 @@ export interface AutoApprovalConfig {
     question: boolean;
     /** Auto-approve update_todo_list */
     todo: boolean;
+    /** Auto-approve skills injection into context (future) */
+    skills: boolean;
 }
 
 /** Legacy — kept for backwards compat */
@@ -312,6 +321,10 @@ export interface ObsidianAgentSettings {
     sidebarPosition: 'left' | 'right';
     showWelcomeMessage: boolean;
     autoAddActiveFileContext: boolean;
+    /** Press Enter to send (Shift+Enter for newline). When false, Ctrl/Cmd+Enter sends. */
+    sendWithEnter: boolean;
+    /** Inject current date and time into the system prompt */
+    includeCurrentTimeInContext: boolean;
 
     // Advanced
     debugMode: boolean;
@@ -333,14 +346,16 @@ export const DEFAULT_SETTINGS: ObsidianAgentSettings = {
     autoApproval: {
         enabled: false,
         showMenuInChat: true,
-        read: true,    // reads are always safe
-        write: false,
+        read: true,         // reads are always safe
+        noteEdits: false,
+        vaultChanges: false,
         web: false,
         mcp: false,
         mode: false,
         subtasks: false,
         question: true,
         todo: true,
+        skills: false,
     },
     autoApprovalRules: {
         readOperations: true,
@@ -373,5 +388,7 @@ export const DEFAULT_SETTINGS: ObsidianAgentSettings = {
     sidebarPosition: 'right',
     showWelcomeMessage: true,
     autoAddActiveFileContext: true,
+    sendWithEnter: true,
+    includeCurrentTimeInContext: true,
     debugMode: false,
 };

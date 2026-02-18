@@ -113,13 +113,29 @@ RESPONSE FORMAT
  * @param mode - The active ModeConfig
  * @param allModes - All available modes (built-in + custom). Used to generate the MODES section.
  * @param globalCustomInstructions - User's global instructions applied to every mode.
+ * @param includeTime - When true, inject current date and time into the context.
  */
 export function buildSystemPromptForMode(
     mode: ModeConfig,
     allModes?: ModeConfig[],
     globalCustomInstructions?: string,
+    includeTime?: boolean,
 ): string {
-    const sections: string[] = [VAULT_CONTEXT, '====', '', 'TOOLS', '', 'You have access to these tools. Use them proactively — do not guess at file contents or vault structure.', ''];
+    let vaultContext = VAULT_CONTEXT;
+    if (includeTime) {
+        const now = new Date();
+        const timeStr = now.toLocaleString(undefined, {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZoneName: 'short',
+        });
+        vaultContext += `\n- Current date and time: ${timeStr}`;
+    }
+    const sections: string[] = [vaultContext, '====', '', 'TOOLS', '', 'You have access to these tools. Use them proactively — do not guess at file contents or vault structure.', ''];
 
     // Add tool sections for this mode's groups
     const groupOrder: ToolGroup[] = ['read', 'vault', 'edit', 'web', 'agent', 'mcp'];

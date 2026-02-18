@@ -164,9 +164,15 @@ export class AgentSidebarView extends ItemView {
         this.textarea.addEventListener('input', () => this.autoResizeTextarea());
 
         this.textarea.addEventListener('keydown', (e: KeyboardEvent) => {
-            if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
-                e.preventDefault();
-                this.handleSendMessage();
+            if (e.key === 'Enter') {
+                const sendWithEnter = this.plugin.settings.sendWithEnter ?? true;
+                if (sendWithEnter && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                    e.preventDefault();
+                    this.handleSendMessage();
+                } else if (!sendWithEnter && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    this.handleSendMessage();
+                }
             }
         });
 
@@ -266,22 +272,35 @@ export class AgentSidebarView extends ItemView {
         }
     }
 
+    /** Returns the effective model key for the current mode (mode override → global fallback) */
+    private getEffectiveModelKey(): string {
+        const modeSlug = this.plugin.settings.currentMode;
+        return this.plugin.settings.modeModelKeys?.[modeSlug] || this.plugin.settings.activeModelKey;
+    }
+
     private updateModelButton(): void {
         if (!this.modelButton) return;
         this.modelButton.empty();
-        const activeKey = this.plugin.settings.activeModelKey;
-        const activeModel = this.plugin.settings.activeModels.find((m) => getModelKey(m) === activeKey);
-        const label = activeModel ? (activeModel.displayName ?? activeModel.name) : 'No model';
-        setIcon(this.modelButton.createSpan('toolbar-icon'), 'cpu');
+        const effectiveKey = this.getEffectiveModelKey();
+        const model = this.plugin.settings.activeModels.find((m) => getModelKey(m) === effectiveKey);
+        const label = model ? (model.displayName ?? model.name) : 'No model';
+        // Show an indicator if the current mode has a model override
+        const hasModeOverride = !!this.plugin.settings.modeModelKeys?.[this.plugin.settings.currentMode];
+        setIcon(this.modelButton.createSpan('toolbar-icon'), hasModeOverride ? 'cpu' : 'cpu');
         this.modelButton.createSpan('model-label').setText(label);
         setIcon(this.modelButton.createSpan('mode-chevron'), 'chevron-down');
-        // Full name as tooltip for when label is truncated
-        (this.modelButton as HTMLButtonElement).title = label;
+        (this.modelButton as HTMLButtonElement).title = hasModeOverride
+            ? `${label} (mode override)`
+            : label;
     }
 
     private showModelMenu(event: MouseEvent): void {
         const enabled = this.plugin.settings.activeModels.filter((m) => m.enabled);
         const menu = new Menu();
+        const modeSlug = this.plugin.settings.currentMode;
+        const modeOverrideKey = this.plugin.settings.modeModelKeys?.[modeSlug] ?? '';
+        const globalKey = this.plugin.settings.activeModelKey;
+        const effectiveKey = modeOverrideKey || globalKey;
 
         if (enabled.length === 0) {
             menu.addItem((item) =>
@@ -291,14 +310,35 @@ export class AgentSidebarView extends ItemView {
                 }),
             );
         } else {
+            // Option to clear mode override (use global default)
+            if (modeOverrideKey) {
+                const globalModel = this.plugin.settings.activeModels.find((m) => getModelKey(m) === globalKey);
+                const globalLabel = globalModel ? (globalModel.displayName ?? globalModel.name) : 'global default';
+                menu.addItem((item) =>
+                    item
+                        .setTitle(`Use global default (${globalLabel})`)
+                        .setIcon('rotate-ccw')
+                        .onClick(async () => {
+                            if (this.plugin.settings.modeModelKeys) {
+                                delete this.plugin.settings.modeModelKeys[modeSlug];
+                            }
+                            await this.plugin.saveSettings();
+                            this.updateModelButton();
+                        }),
+                );
+                menu.addSeparator();
+            }
+
             enabled.forEach((model) => {
                 const key = getModelKey(model);
                 menu.addItem((item) =>
                     item
                         .setTitle(model.displayName ?? model.name)
-                        .setChecked(this.plugin.settings.activeModelKey === key)
+                        .setChecked(effectiveKey === key)
                         .onClick(async () => {
-                            this.plugin.settings.activeModelKey = key;
+                            // Set as mode-specific override (not global default)
+                            if (!this.plugin.settings.modeModelKeys) this.plugin.settings.modeModelKeys = {};
+                            this.plugin.settings.modeModelKeys[modeSlug] = key;
                             await this.plugin.saveSettings();
                             this.updateModelButton();
                         }),
@@ -460,15 +500,12 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
         let hasTools = false;           // have any tools been called in this task?
         let isThinking = false;         // thinking is currently active
 
-        // Throttle: re-render Markdown at most every 80 ms (not on every streamed token).
-        // Without this, MarkdownRenderer.render() fires O(n) times and re-parses the
-        // entire accumulated text on every chunk — effectively O(n²) total work.
-        let renderPending = false;
-        const flushRender = () => {
-            renderPending = false;
-            contentEl.empty();
-            MarkdownRenderer.render(this.app, accumulatedText, contentEl, '', this);
-        };
+        // Streaming text container: during Q&A streaming we append raw text chunks
+        // directly into this element (O(1) per chunk, zero re-parses).
+        // On completion a single MarkdownRenderer.render() replaces it with the
+        // formatted result.  This gives instant first-character display and avoids
+        // the previous 80 ms delay before the user saw anything.
+        let streamingPara: HTMLElement | null = null;
 
         // rAF-throttled scroll: collapses many per-chunk scrollTo() calls into one
         // paint-cycle scroll, eliminating repeated forced reflows.
@@ -548,13 +585,14 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
                     }
                     accumulatedText += chunk;
                     if (!hasTools) {
-                        // Q&A mode: throttle Markdown re-render to ≤ once per 80 ms.
-                        // Without this every token triggers a full re-parse of all
-                        // accumulated text — O(n²) total work for an n-token response.
-                        if (!renderPending) {
-                            renderPending = true;
-                            setTimeout(flushRender, 80);
+                        // Q&A streaming: append raw text directly — O(1), no re-parse.
+                        // On first chunk, clear the loading state and create the container.
+                        // On completion, the container is replaced by a full Markdown render.
+                        if (!streamingPara) {
+                            contentEl.empty();
+                            streamingPara = contentEl.createEl('p', { cls: 'streaming-para' });
                         }
+                        streamingPara.insertAdjacentText('beforeend', chunk);
                         scheduleScroll();
                     }
                     // Agentic mode: text is buffered and rendered once in onComplete.
@@ -637,12 +675,12 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
                     return this.showApprovalCard(toolName, input, toolsEl);
                 },
                 onComplete: () => {
-                    // Cancel any in-flight throttled render and do a definitive final render.
-                    // This ensures the last streamed tokens are always visible even if the
-                    // 80 ms throttle timer hasn't fired yet.
+                    // Replace the raw streaming text with the properly formatted Markdown.
+                    // This fires exactly once — giving us instant streaming + clean final output.
+                    streamingPara = null;
                     if (accumulatedText) {
-                        renderPending = false;
-                        flushRender();
+                        contentEl.empty();
+                        MarkdownRenderer.render(this.app, accumulatedText, contentEl, '', this);
                     }
                     // Show timestamp in footer even without token usage
                     if (footerEl.style.display === 'none') {
@@ -687,6 +725,7 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
             this.conversationHistory,
             this.currentAbortController.signal,
             this.plugin.settings.globalCustomInstructions || undefined,
+            this.plugin.settings.includeCurrentTimeInContext ?? true,
         );
     }
 
@@ -830,6 +869,7 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
     private switchMode(modeSlug: string): void {
         this.modeService.switchMode(modeSlug); // saves settings
         this.updateModeButton();
+        this.updateModelButton(); // model may differ per mode
     }
 
     // -------------------------------------------------------------------------
@@ -1157,14 +1197,17 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
             if (!target) { resolve('approved'); return; }
 
             const group = this.getToolGroup(toolName);
-            const groupLabels: Record<string, string> = { write: 'write', web: 'web', mcp: 'MCP', read: 'read' };
+            const groupLabels: Record<string, string> = {
+                'note-edit': 'note edits', 'vault-change': 'vault changes',
+                web: 'web', mcp: 'MCP', read: 'read',
+            };
 
             // Compact inline row — appears within the tool call area
             const row = target.createDiv('tool-approval-row');
             const iconSpan = row.createSpan('tool-approval-icon');
             setIcon(iconSpan, 'shield-alert');
             row.createSpan('tool-approval-text').setText(
-                `${this.formatToolLabel(toolName)} — ${groupLabels[group]} not enabled`
+                `${this.formatToolLabel(toolName)} — ${groupLabels[group] ?? group} not enabled`
             );
 
             const actions = row.createDiv('tool-approval-actions');
@@ -1178,9 +1221,8 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
             denyBtn.addEventListener('click', () => { cleanup(); resolve('rejected'); });
             enableBtn.addEventListener('click', async () => {
                 this.plugin.settings.autoApproval.enabled = true;
-                if (group === 'write') this.plugin.settings.autoApproval.write = true;
-                else if (group === 'web') this.plugin.settings.autoApproval.web = true;
-                else if (group === 'mcp') this.plugin.settings.autoApproval.mcp = true;
+                const permKey = this.groupToPermKey(group);
+                if (permKey) (this.plugin.settings.autoApproval as any)[permKey] = true;
                 await this.plugin.saveSettings();
                 cleanup();
                 resolve('approved');
@@ -1190,14 +1232,25 @@ Select a mode in the toolbar below and start chatting. The agent can read and wr
         });
     }
 
-    private getToolGroup(toolName: string): 'write' | 'web' | 'mcp' | 'read' {
+    private getToolGroup(toolName: string): 'note-edit' | 'vault-change' | 'web' | 'mcp' | 'read' {
         const webTools = ['web_fetch', 'web_search'];
         const mcpTools = ['use_mcp_tool'];
-        const readTools = ['read_file', 'list_files', 'search_files', 'get_frontmatter', 'get_linked_notes', 'get_vault_stats', 'search_by_tag', 'get_daily_note'];
+        const readTools = ['read_file', 'list_files', 'search_files', 'get_frontmatter', 'get_linked_notes', 'get_vault_stats', 'search_by_tag', 'get_daily_note', 'query_base'];
+        const vaultChangeTools = ['create_folder', 'delete_file', 'move_file', 'generate_canvas', 'create_base', 'update_base'];
         if (webTools.includes(toolName)) return 'web';
         if (mcpTools.includes(toolName)) return 'mcp';
         if (readTools.includes(toolName)) return 'read';
-        return 'write';
+        if (vaultChangeTools.includes(toolName)) return 'vault-change';
+        return 'note-edit'; // write_file, edit_file, append_to_file, update_frontmatter
+    }
+
+    /** Map a tool group to the corresponding permission key in autoApproval config */
+    private groupToPermKey(group: string): 'noteEdits' | 'vaultChanges' | 'web' | 'mcp' | null {
+        if (group === 'note-edit') return 'noteEdits';
+        if (group === 'vault-change') return 'vaultChanges';
+        if (group === 'web') return 'web';
+        if (group === 'mcp') return 'mcp';
+        return null;
     }
 
     // -------------------------------------------------------------------------

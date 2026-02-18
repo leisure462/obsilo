@@ -25,9 +25,10 @@ import type { IgnoreService } from '../governance/IgnoreService';
 import type { OperationLogger } from '../governance/OperationLogger';
 
 /** Tool group classification for auto-approval checks */
-type ToolGroup = 'read' | 'write' | 'web' | 'agent' | 'mcp';
+type ToolGroup = 'read' | 'note-edit' | 'vault-change' | 'web' | 'agent' | 'mcp';
 
 const TOOL_GROUPS: Record<string, ToolGroup> = {
+    // Read-only vault tools
     read_file: 'read',
     list_files: 'read',
     search_files: 'read',
@@ -37,24 +38,29 @@ const TOOL_GROUPS: Record<string, ToolGroup> = {
     search_by_tag: 'read',
     get_daily_note: 'read',
     query_base: 'read',
-    write_file: 'write',
-    edit_file: 'write',
-    append_to_file: 'write',
-    create_folder: 'write',
-    delete_file: 'write',
-    move_file: 'write',
-    update_frontmatter: 'write',
-    generate_canvas: 'write',
-    create_base: 'write',
-    update_base: 'write',
+    // Note content edits (write_file, edit_file, append_to_file, update_frontmatter)
+    write_file: 'note-edit',
+    edit_file: 'note-edit',
+    append_to_file: 'note-edit',
+    update_frontmatter: 'note-edit',
+    // Vault structural changes (create_folder, delete_file, move_file)
+    create_folder: 'vault-change',
+    delete_file: 'vault-change',
+    move_file: 'vault-change',
+    generate_canvas: 'vault-change',
+    create_base: 'vault-change',
+    update_base: 'vault-change',
+    // Web
     web_fetch: 'web',
     web_search: 'web',
+    // Agent control (always auto-approved)
     ask_followup_question: 'agent',
     attempt_completion: 'agent',
     switch_mode: 'agent',
     new_task: 'agent',
     update_todo_list: 'agent',
     open_note: 'agent',
+    // MCP
     use_mcp_tool: 'mcp',
 };
 
@@ -119,7 +125,8 @@ export class ToolExecutionPipeline {
             }
 
             // 3. Auto-approve or request approval for write/web/mcp operations
-            if (tool.isWriteOperation || TOOL_GROUPS[toolCall.name] === 'web' || TOOL_GROUPS[toolCall.name] === 'mcp') {
+            const toolGroup = TOOL_GROUPS[toolCall.name];
+            if (tool.isWriteOperation || toolGroup === 'web' || toolGroup === 'mcp') {
                 const decision = await this.checkApproval(toolCall, extensions);
                 if (decision === 'rejected') {
                     return this.errorResult(toolCall.id, 'Operation denied by user');
@@ -220,17 +227,18 @@ export class ToolExecutionPipeline {
         extensions?: ContextExtensions,
     ): Promise<'auto' | 'approved' | 'rejected'> {
         const cfg = this.plugin.settings.autoApproval;
-        const group = TOOL_GROUPS[toolCall.name] ?? 'write';
+        const group = TOOL_GROUPS[toolCall.name] ?? 'note-edit';
+
+        // Agent tools (question, todo, completion, mode) are always auto-approved
+        if (group === 'agent') return 'auto';
 
         // Check if auto-approved by settings
         if (cfg.enabled) {
-            if (group === 'write' && cfg.write) return 'auto';
+            if (group === 'note-edit' && cfg.noteEdits) return 'auto';
+            if (group === 'vault-change' && cfg.vaultChanges) return 'auto';
             if (group === 'web' && cfg.web) return 'auto';
             if (group === 'mcp' && cfg.mcp) return 'auto';
         }
-
-        // Agent tools (question, todo, completion) are always auto-approved
-        if (group === 'agent') return 'auto';
 
         // No auto-approve config AND no approval callback — default allow
         // (avoids blocking when UI hasn't wired up approval yet)

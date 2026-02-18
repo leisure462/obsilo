@@ -792,13 +792,19 @@
     margin-bottom: 8px;
 }
 
+/* Models table: name | provider | key | enable-toggle | default-radio | actions */
 .model-row {
     display: grid;
-    grid-template-columns: 1fr 80px 32px 44px 56px;
+    grid-template-columns: 1fr 100px 36px 56px 56px 48px;
     align-items: center;
     padding: 5px 8px;
     gap: 4px;
     border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* Embeddings table: name | provider | key | active-radio | actions */
+.embedding-table .model-row {
+    grid-template-columns: 1fr 100px 36px 56px 48px;
 }
 
 .model-row:last-child { border-bottom: none; }
@@ -808,7 +814,7 @@
     color: var(--text-muted);
     font-size: 11px;
     font-weight: 500;
-    padding: 5px 8px;          /* was 4px — aligned with body rows */
+    padding: 5px 8px;
 }
 
 .model-row-active .mc-name-text { color: var(--interactive-accent); }
@@ -829,11 +835,53 @@
 .mc-key-ok { color: var(--color-green); }
 .mc-key-missing { color: var(--text-faint); }
 
+/* ── Enable column — small toggle switch ─────── */
 .mc-enable { display: flex; justify-content: center; align-items: center; }
-.mc-enable input[type='checkbox'] { cursor: pointer; }
+
+.mc-toggle {
+    position: relative;
+    display: inline-block;
+    width: 28px;
+    height: 16px;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+.mc-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+.mc-toggle-track {
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    background: var(--background-modifier-border);
+    transition: background 0.18s;
+}
+.mc-toggle-track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--background-primary);
+    transition: transform 0.18s;
+}
+.mc-toggle input:checked + .mc-toggle-track {
+    background: var(--interactive-accent);
+}
+.mc-toggle input:checked + .mc-toggle-track::after {
+    transform: translateX(12px);
+}
+
+/* ── Default column — radio button ──────────── */
+.mc-default { display: flex; justify-content: center; align-items: center; }
+.mc-default input[type='radio'] { cursor: pointer; width: 14px; height: 14px; accent-color: var(--interactive-accent); }
 
 .mc-actions { display: flex; gap: 4px; justify-content: flex-end; align-items: center; }
-
 .mc-actions button { padding: 3px 5px; border-radius: 4px; }
 
 .mc-action-btn {
@@ -859,6 +907,13 @@
     font-size: 12px;
     text-align: center;
     font-style: italic;
+}
+
+.model-table-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    line-height: 1.5;
 }
 
 /* ── Model Config Modal ─────────────────────────────────────────────────── */
@@ -1912,6 +1967,56 @@
     cursor: default;
 }
 
+/* Customized badge (built-in modes with user overrides) */
+
+.modes-customized-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    margin-bottom: 12px;
+    background: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--interactive-accent) 30%, transparent);
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+.modes-customized-icon {
+    display: flex;
+    align-items: center;
+    color: var(--interactive-accent);
+}
+
+.modes-customized-icon svg {
+    width: 13px;
+    height: 13px;
+}
+
+.modes-customized-text {
+    color: var(--interactive-accent);
+    font-weight: 500;
+}
+
+.modes-restore-btn {
+    font-size: 12px;
+    padding: 3px 10px;
+    background: transparent;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.modes-restore-btn:hover:not(:disabled) {
+    color: var(--text-normal);
+    border-color: var(--text-muted);
+}
+
+.modes-restore-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
 /* Bottom action bar */
 
 .modes-bottom-bar {
@@ -2110,6 +2215,16 @@
     margin-top: 8px;
 }
 
+/* ── Streaming text container ────────────────────────────────────── */
+/* Raw text appended per-chunk during streaming; replaced by Markdown on complete */
+.streaming-para {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: var(--line-height-normal);
+    color: var(--text-normal);
+}
+
 /* ── Per-model temperature controls (ModelConfigModal) ────────────── */
 
 .mcm-temperature-controls {
@@ -2155,3 +2270,5 @@
     color: var(--text-muted);
     font-style: italic;
 }
+
+

@@ -1330,11 +1330,16 @@ export class AgentSettingsTab extends PluginSettingTab {
     // ---------------------------------------------------------------------------
 
     private buildModesTab(container: HTMLElement): void {
-        // Collect all selectable modes (built-in + custom, not __custom instruction entries)
+        // Collect all selectable modes (built-in + custom, not __custom instruction entries).
+        // Vault entries with the same slug as a built-in are overrides — they are already
+        // represented by the built-in entry in the dropdown, so exclude them here.
+        const builtInSlugs = new Set(BUILT_IN_MODES.map((m) => m.slug));
         const getAllModes = (): ModeConfig[] => [
             ...BUILT_IN_MODES,
             ...((this.plugin as any).modeService?.getGlobalModes?.() ?? []),
-            ...this.plugin.settings.customModes.filter((m) => m.source === 'vault' && !m.slug.endsWith('__custom')),
+            ...this.plugin.settings.customModes.filter(
+                (m) => m.source === 'vault' && !m.slug.endsWith('__custom') && !builtInSlugs.has(m.slug),
+            ),
         ];
 
         let selectedSlug = this.plugin.settings.currentMode;
@@ -1351,7 +1356,7 @@ export class AgentSettingsTab extends PluginSettingTab {
             const groups: { label: string; modes: ModeConfig[] }[] = [
                 { label: 'Built-in', modes: BUILT_IN_MODES },
                 { label: 'Global (all vaults)', modes: (this.plugin as any).modeService?.getGlobalModes?.() ?? [] },
-                { label: 'This Vault', modes: this.plugin.settings.customModes.filter((m) => m.source === 'vault' && !m.slug.endsWith('__custom')) },
+                { label: 'This Vault', modes: this.plugin.settings.customModes.filter((m) => m.source === 'vault' && !m.slug.endsWith('__custom') && !builtInSlugs.has(m.slug)) },
             ];
             for (const group of groups) {
                 if (group.modes.length === 0) continue;
@@ -1376,30 +1381,67 @@ export class AgentSettingsTab extends PluginSettingTab {
             formArea.empty();
 
             const builtIn = BUILT_IN_MODES.find((m) => m.slug === slug);
-            const custom = this.plugin.settings.customModes.find(
-                (m) => m.slug === slug && m.source === 'vault',
-            );
-            const mode = builtIn ?? custom;
+            // Vault override: same slug as built-in, stored in customModes with source 'vault'
+            const vaultOverride = builtIn
+                ? this.plugin.settings.customModes.find(
+                      (m) => m.slug === slug && m.source === 'vault' && !m.slug.endsWith('__custom'),
+                  )
+                : undefined;
+            // Vault custom mode (not a built-in at all)
+            const vaultCustom = !builtIn
+                ? this.plugin.settings.customModes.find(
+                      (m) => m.slug === slug && m.source === 'vault',
+                  )
+                : undefined;
+            // Global mode (not a built-in, not in customModes)
+            const globalMode: ModeConfig | undefined = !builtIn && !vaultCustom
+                ? ((this.plugin as any).modeService?.getGlobalModes?.() ?? []).find(
+                      (m: ModeConfig) => m.slug === slug,
+                  )
+                : undefined;
+
+            // Effective mode for display: override > built-in > vault custom > global
+            const mode = vaultOverride ?? builtIn ?? vaultCustom ?? globalMode;
             if (!mode) return;
 
-            const isBuiltIn = mode.source === 'built-in';
-            const isGlobal = mode.source === 'global';
-            const isEditable = !isBuiltIn; // both 'vault' and 'global' modes are user-editable
+            const isBuiltIn = !!builtIn;
+            const isGlobal = !!globalMode;
 
-            // Custom instructions entry (for built-in modes)
-            const ciEntry = this.plugin.settings.customModes.find(
-                (m) => m.slug === `${slug}__custom`,
-            );
+            /**
+             * Returns the mutable reference for this mode's edits.
+             * For built-in modes this lazily creates a vault override entry so
+             * that changes are persisted without mutating the constant.
+             */
+            const getOrCreateEditable = (): ModeConfig => {
+                if (isBuiltIn) {
+                    let ov = this.plugin.settings.customModes.find(
+                        (m) => m.slug === slug && m.source === 'vault' && !m.slug.endsWith('__custom'),
+                    );
+                    if (!ov) {
+                        ov = { ...builtIn!, source: 'vault' };
+                        this.plugin.settings.customModes.push(ov);
+                    }
+                    return ov;
+                }
+                if (isGlobal) return globalMode!;
+                return vaultCustom!;
+            };
 
-            // Helper: saves vault modes to settings, global modes to disk
             const saveMode = async () => {
                 if (isGlobal) {
-                    await GlobalModeStore.updateMode(mode);
+                    await GlobalModeStore.updateMode(globalMode!);
                     await (this.plugin as any).modeService?.reloadGlobalModes?.();
                 } else {
                     await this.plugin.saveSettings();
                 }
             };
+
+            // ── Customized badge (built-in modes that have been overridden) ────
+            if (isBuiltIn && vaultOverride) {
+                const badge = formArea.createDiv('modes-customized-badge');
+                setIcon(badge.createSpan('modes-customized-icon'), 'pencil');
+                badge.createEl('span', { cls: 'modes-customized-text', text: 'This mode has been customised' });
+            }
 
             // ── Model Selection ───────────────────────────────────────────────
             const modelSetting = new Setting(formArea)
@@ -1427,12 +1469,16 @@ export class AgentSettingsTab extends PluginSettingTab {
                 .setName('Name')
                 .addText((t) => {
                     t.setValue(mode.name);
-                    if (isBuiltIn) t.inputEl.disabled = true;
-                    else t.onChange(async (v) => {
-                        custom!.name = v;
-                        await saveMode();
-                        refreshSelect();
-                    });
+                    // Name is read-only for built-in modes (slug must remain stable)
+                    if (isBuiltIn) {
+                        t.inputEl.disabled = true;
+                    } else {
+                        t.onChange(async (v) => {
+                            getOrCreateEditable().name = v;
+                            await saveMode();
+                            refreshSelect();
+                        });
+                    }
                 });
 
             // ── Slug (always read-only) ───────────────────────────────────────
@@ -1440,27 +1486,25 @@ export class AgentSettingsTab extends PluginSettingTab {
                 .setName('Slug')
                 .addText((t) => { t.setValue(mode.slug); t.inputEl.disabled = true; });
 
-            // ── Short description (for humans) ────────────────────────────────
+            // ── Short description ─────────────────────────────────────────────
             const descWrap = formArea.createDiv('modes-field');
             descWrap.createEl('div', { cls: 'modes-field-label', text: 'Short description (for humans)' });
             descWrap.createEl('div', { cls: 'modes-field-desc', text: 'Brief description shown in the mode selector dropdown.' });
             const descTextarea = descWrap.createEl('textarea', { cls: 'modes-textarea', attr: { placeholder: 'Brief description...' } });
             descTextarea.value = mode.description || '';
             descTextarea.rows = 2;
-            descTextarea.disabled = isBuiltIn;
-            if (!isBuiltIn) {
-                descTextarea.addEventListener('input', async () => {
-                    custom!.description = descTextarea.value;
-                    await saveMode();
-                });
-            }
+            descTextarea.addEventListener('input', async () => {
+                const editable = getOrCreateEditable();
+                editable.description = descTextarea.value;
+                await saveMode();
+            });
 
             // ── When to Use ───────────────────────────────────────────────────
             const wtuWrap = formArea.createDiv('modes-field');
             wtuWrap.createEl('div', { cls: 'modes-field-label', text: 'When to Use (optional)' });
             wtuWrap.createEl('div', {
                 cls: 'modes-field-desc',
-                text: 'Guidance for the Orchestrator when deciding which mode to delegate a subtask to. Not shown in the mode selector.',
+                text: 'Guidance for the Orchestrator when deciding which mode to delegate a subtask to.',
             });
             const wtuTextarea = wtuWrap.createEl('textarea', {
                 cls: 'modes-textarea',
@@ -1468,13 +1512,11 @@ export class AgentSettingsTab extends PluginSettingTab {
             });
             wtuTextarea.value = mode.whenToUse ?? '';
             wtuTextarea.rows = 3;
-            wtuTextarea.disabled = isBuiltIn;
-            if (!isBuiltIn) {
-                wtuTextarea.addEventListener('input', async () => {
-                    custom!.whenToUse = wtuTextarea.value;
-                    await saveMode();
-                });
-            }
+            wtuTextarea.addEventListener('input', async () => {
+                const editable = getOrCreateEditable();
+                editable.whenToUse = wtuTextarea.value;
+                await saveMode();
+            });
 
             // ── Available Tools ───────────────────────────────────────────────
             const toolsWrap = formArea.createDiv('modes-field');
@@ -1482,7 +1524,7 @@ export class AgentSettingsTab extends PluginSettingTab {
             toolsHeaderRow.createEl('div', { cls: 'modes-field-label', text: 'Available Tools' });
 
             let toolsEditMode = false;
-            let toolsBody = toolsWrap.createDiv('modes-tools-body');
+            const toolsBody = toolsWrap.createDiv('modes-tools-body');
 
             const renderToolsReadOnly = () => {
                 toolsBody.empty();
@@ -1494,9 +1536,6 @@ export class AgentSettingsTab extends PluginSettingTab {
                         cls: 'modes-tools-list',
                         text: enabled.map((g) => TOOL_GROUP_META[g]?.label ?? g).join(', '),
                     });
-                }
-                if (isBuiltIn) {
-                    toolsBody.createEl('div', { cls: 'modes-field-desc', text: 'Tools for built-in modes cannot be modified.' });
                 }
             };
 
@@ -1511,13 +1550,14 @@ export class AgentSettingsTab extends PluginSettingTab {
                     labelEl.createEl('strong', { text: meta.label });
                     labelEl.createEl('span', { cls: 'modes-group-desc', text: ` — ${meta.desc}` });
                     cb.addEventListener('change', async () => {
+                        const editable = getOrCreateEditable();
                         if (cb.checked) {
-                            if (!custom!.toolGroups.includes(group as any)) custom!.toolGroups.push(group as any);
+                            if (!editable.toolGroups.includes(group as any)) editable.toolGroups.push(group as any);
                         } else {
-                            custom!.toolGroups = custom!.toolGroups.filter((g) => g !== group);
+                            editable.toolGroups = editable.toolGroups.filter((g) => g !== group);
                         }
-                        // reflect on the read-only mode object for display
-                        (mode as any).toolGroups = [...custom!.toolGroups];
+                        // Keep display-mode object in sync
+                        (mode as any).toolGroups = [...editable.toolGroups];
                         await saveMode();
                     });
                 }
@@ -1525,81 +1565,62 @@ export class AgentSettingsTab extends PluginSettingTab {
 
             renderToolsReadOnly();
 
-            // "Edit tools" button (custom modes only)
-            if (!isBuiltIn) {
-                const editToolsBtn = toolsHeaderRow.createEl('button', {
-                    text: 'Edit tools',
-                    cls: 'modes-edit-tools-btn',
-                });
-                editToolsBtn.addEventListener('click', () => {
-                    toolsEditMode = !toolsEditMode;
-                    editToolsBtn.setText(toolsEditMode ? 'Done' : 'Edit tools');
-                    if (toolsEditMode) renderToolsEdit();
-                    else renderToolsReadOnly();
-                });
-            }
+            // "Edit tools" button (all modes)
+            const editToolsBtn = toolsHeaderRow.createEl('button', {
+                text: 'Edit tools',
+                cls: 'modes-edit-tools-btn',
+            });
+            editToolsBtn.addEventListener('click', () => {
+                toolsEditMode = !toolsEditMode;
+                editToolsBtn.setText(toolsEditMode ? 'Done' : 'Edit tools');
+                if (toolsEditMode) renderToolsEdit();
+                else renderToolsReadOnly();
+            });
 
             // ── Role Definition ───────────────────────────────────────────────
             const roleWrap = formArea.createDiv('modes-field');
             roleWrap.createEl('div', { cls: 'modes-field-label', text: 'Role Definition' });
             roleWrap.createEl('div', {
                 cls: 'modes-field-desc',
-                text: isBuiltIn
-                    ? 'Define the agent\'s expertise and personality. Read-only for built-in modes.'
-                    : 'Define the agent\'s expertise and personality for this mode.',
+                text: 'Core system prompt defining this agent\'s expertise and personality.',
             });
             const roleTextarea = roleWrap.createEl('textarea', { cls: 'modes-textarea' });
             roleTextarea.value = mode.roleDefinition || '';
             roleTextarea.rows = 8;
-            roleTextarea.disabled = isBuiltIn;
-            if (!isBuiltIn) {
-                roleTextarea.addEventListener('input', async () => {
-                    custom!.roleDefinition = roleTextarea.value;
-                    await saveMode();
-                });
-            }
+            roleTextarea.addEventListener('input', async () => {
+                const editable = getOrCreateEditable();
+                editable.roleDefinition = roleTextarea.value;
+                (mode as any).roleDefinition = editable.roleDefinition;
+                await saveMode();
+            });
 
             // ── Mode-specific Custom Instructions ─────────────────────────────
             const ciWrap = formArea.createDiv('modes-field');
             ciWrap.createEl('div', { cls: 'modes-field-label', text: 'Mode-specific Custom Instructions (optional)' });
             ciWrap.createEl('div', {
                 cls: 'modes-field-desc',
-                text: `Add behavioral guidelines specific to ${mode.name} mode.`,
+                text: `Behavioral guidelines appended after the role definition for ${mode.name} mode.`,
             });
             const ciTextarea = ciWrap.createEl('textarea', {
                 cls: 'modes-textarea',
                 attr: { placeholder: `Add behavioral guidelines specific to ${mode.name} mode...` },
             });
+            // Read from override (preferred) or legacy __custom entry
+            const legacyCi = this.plugin.settings.customModes.find((m) => m.slug === `${slug}__custom`);
             ciTextarea.value = isBuiltIn
-                ? (ciEntry?.customInstructions ?? '')
+                ? (vaultOverride?.customInstructions ?? legacyCi?.customInstructions ?? '')
                 : (mode.customInstructions ?? '');
             ciTextarea.rows = 4;
             ciTextarea.addEventListener('input', async () => {
                 const value = ciTextarea.value.trim();
+                const editable = getOrCreateEditable();
+                editable.customInstructions = value || undefined;
                 if (isBuiltIn) {
-                    const idx = this.plugin.settings.customModes.findIndex(
-                        (m) => m.slug === `${slug}__custom`,
-                    );
-                    if (value) {
-                        const entry: ModeConfig = {
-                            slug: `${slug}__custom`,
-                            name: mode.name,
-                            icon: mode.icon,
-                            description: mode.description,
-                            roleDefinition: mode.roleDefinition,
-                            toolGroups: mode.toolGroups,
-                            source: 'built-in',
-                            customInstructions: value,
-                        };
-                        if (idx >= 0) this.plugin.settings.customModes[idx] = entry;
-                        else this.plugin.settings.customModes.push(entry);
-                    } else {
-                        if (idx >= 0) this.plugin.settings.customModes.splice(idx, 1);
-                    }
-                } else {
-                    custom!.customInstructions = value;
+                    // Migrate away from legacy __custom entry
+                    const legacyIdx = this.plugin.settings.customModes.findIndex((m) => m.slug === `${slug}__custom`);
+                    if (legacyIdx >= 0) this.plugin.settings.customModes.splice(legacyIdx, 1);
                 }
-                await this.plugin.saveSettings();
+                await saveMode();
             });
 
             // ── Bottom action bar ─────────────────────────────────────────────
@@ -1620,21 +1641,13 @@ export class AgentSettingsTab extends PluginSettingTab {
             // Preview System Prompt
             const previewBtn = bottomBar.createEl('button', { text: 'Preview Prompt', cls: 'modes-preview-btn' });
             previewBtn.addEventListener('click', () => {
-                // Build the effective ModeConfig: built-in base + merged custom instructions
-                const effectiveMode: ModeConfig = { ...mode };
-                if (isBuiltIn) {
-                    const ciE = this.plugin.settings.customModes.find(
-                        (m) => m.slug === `${slug}__custom`,
-                    );
-                    effectiveMode.customInstructions = ciE?.customInstructions ?? undefined;
-                }
                 const allModes = [
                     ...BUILT_IN_MODES,
                     ...((this.plugin as any).modeService?.getGlobalModes?.() ?? []),
                     ...this.plugin.settings.customModes.filter((m) => m.source === 'vault' && !m.slug.endsWith('__custom')),
                 ];
                 const prompt = buildSystemPromptForMode(
-                    effectiveMode,
+                    mode,
                     allModes,
                     this.plugin.settings.globalCustomInstructions || undefined,
                 );
@@ -1656,7 +1669,33 @@ export class AgentSettingsTab extends PluginSettingTab {
                 URL.revokeObjectURL(url);
             });
 
-            // Delete (custom modes only)
+            // Restore defaults (built-in modes only — visible, disabled unless there is an override)
+            if (isBuiltIn) {
+                const hasOverride = !!this.plugin.settings.customModes.find(
+                    (m) => (m.slug === slug && m.source === 'vault') || m.slug === `${slug}__custom`,
+                );
+                const restoreBtn = bottomBar.createEl('button', {
+                    text: 'Restore defaults',
+                    cls: 'modes-restore-btn',
+                });
+                if (!hasOverride) restoreBtn.disabled = true;
+                restoreBtn.addEventListener('click', async () => {
+                    // Remove vault override + legacy __custom entry (restores role definition,
+                    // tool groups, custom instructions, and agent instructions to built-in defaults)
+                    this.plugin.settings.customModes = this.plugin.settings.customModes.filter(
+                        (m) => !(m.slug === slug && m.source === 'vault') && m.slug !== `${slug}__custom`,
+                    );
+                    // Also clear the per-mode model override so global default is used again
+                    if (this.plugin.settings.modeModelKeys) {
+                        delete this.plugin.settings.modeModelKeys[slug];
+                    }
+                    await this.plugin.saveSettings();
+                    new Notice(`${mode.name} restored to defaults`);
+                    renderForm(slug);
+                });
+            }
+
+            // Delete (non-built-in modes only)
             if (!isBuiltIn) {
                 const deleteBtn = bottomBar.createEl('button', {
                     text: 'Delete',
@@ -1760,6 +1799,7 @@ export class AgentSettingsTab extends PluginSettingTab {
         header.createDiv({ cls: 'mc-provider', text: 'Provider' });
         header.createDiv({ cls: 'mc-key', text: 'Key' });
         header.createDiv({ cls: 'mc-enable', text: 'Enable' });
+        header.createDiv({ cls: 'mc-default', text: 'Default' });
         header.createDiv({ cls: 'mc-actions' });
 
         // Rows
@@ -1809,20 +1849,34 @@ export class AgentSettingsTab extends PluginSettingTab {
         setIcon(keyIcon, hasKey ? 'check' : 'minus');
         keyEl.addClass(hasKey ? 'mc-key-ok' : 'mc-key-missing');
 
-        // Enable toggle
+        // Enable — small toggle switch
         const enableEl = row.createDiv('mc-enable');
-        const toggle = enableEl.createEl('input', { attr: { type: 'checkbox' } });
-        toggle.checked = model.enabled;
-        toggle.addEventListener('change', async () => {
+        const toggleLabel = enableEl.createEl('label', { cls: 'mc-toggle' });
+        const toggleInput = toggleLabel.createEl('input', { attr: { type: 'checkbox' } });
+        toggleLabel.createSpan({ cls: 'mc-toggle-track' });
+        toggleInput.checked = model.enabled;
+        toggleInput.addEventListener('change', async () => {
             const idx = this.plugin.settings.activeModels.findIndex((m) => getModelKey(m) === key);
-            if (idx !== -1) this.plugin.settings.activeModels[idx].enabled = toggle.checked;
+            if (idx !== -1) this.plugin.settings.activeModels[idx].enabled = toggleInput.checked;
             await this.plugin.saveSettings();
-            // Re-render just the row state without full redraw
-            row.toggleClass('model-row-disabled', !toggle.checked);
+            row.toggleClass('model-row-disabled', !toggleInput.checked);
+        });
+
+        // Default — radio button (single selection)
+        const defaultEl = row.createDiv('mc-default');
+        const defaultRadio = defaultEl.createEl('input', { attr: { type: 'radio', name: 'active-model' } });
+        defaultRadio.checked = isActive;
+        defaultRadio.addEventListener('change', async () => {
+            if (defaultRadio.checked) {
+                this.plugin.settings.activeModelKey = key;
+                await this.plugin.saveSettings();
+                this.display();
+            }
         });
 
         // Actions
         const actionsEl = row.createDiv('mc-actions');
+
         const configBtn = actionsEl.createEl('button', { cls: 'mc-action-btn', attr: { title: 'Configure' } });
         setIcon(configBtn, 'settings');
         configBtn.addEventListener('click', () => {
@@ -1856,10 +1910,10 @@ export class AgentSettingsTab extends PluginSettingTab {
 
     private buildEmbeddingsTab(container: HTMLElement): void {
         const desc = container.createDiv('model-table-desc');
-        desc.createSpan({ text: 'Embedding models are used for semantic search. Select one model as active — it will be used to index your vault.' });
+        desc.setText('Embedding models power semantic search across your vault. Select exactly one model as the active index.');
 
         // Table header
-        const table = container.createDiv('model-table');
+        const table = container.createDiv('model-table embedding-table');
         const header = table.createDiv('model-row model-row-header');
         header.createDiv({ cls: 'mc-name', text: 'Model' });
         header.createDiv({ cls: 'mc-provider', text: 'Provider' });
@@ -1998,11 +2052,21 @@ export class AgentSettingsTab extends PluginSettingTab {
             );
 
         new Setting(container)
-            .setName('Write operations')
-            .setDesc('write_file, edit_file, append_to_file, create_folder, delete_file, move_file.')
+            .setName('Note edits')
+            .setDesc('write_file, edit_file, append_to_file, update_frontmatter — changes to note content.')
             .addToggle((t) =>
-                t.setValue(this.plugin.settings.autoApproval.write).onChange(async (v) => {
-                    this.plugin.settings.autoApproval.write = v;
+                t.setValue(this.plugin.settings.autoApproval.noteEdits).onChange(async (v) => {
+                    this.plugin.settings.autoApproval.noteEdits = v;
+                    await this.plugin.saveSettings();
+                }),
+            );
+
+        new Setting(container)
+            .setName('Vault structure changes')
+            .setDesc('create_folder, delete_file, move_file — changes to vault organisation.')
+            .addToggle((t) =>
+                t.setValue(this.plugin.settings.autoApproval.vaultChanges).onChange(async (v) => {
+                    this.plugin.settings.autoApproval.vaultChanges = v;
                     await this.plugin.saveSettings();
                 }),
             );
@@ -2023,6 +2087,46 @@ export class AgentSettingsTab extends PluginSettingTab {
             .addToggle((t) =>
                 t.setValue(this.plugin.settings.autoApproval.mcp).onChange(async (v) => {
                     this.plugin.settings.autoApproval.mcp = v;
+                    await this.plugin.saveSettings();
+                }),
+            );
+
+        new Setting(container)
+            .setName('Mode switching')
+            .setDesc('switch_mode — agent switches to a different mode mid-task.')
+            .addToggle((t) =>
+                t.setValue(this.plugin.settings.autoApproval.mode).onChange(async (v) => {
+                    this.plugin.settings.autoApproval.mode = v;
+                    await this.plugin.saveSettings();
+                }),
+            );
+
+        new Setting(container)
+            .setName('Subtasks')
+            .setDesc('new_task — agent spawns a sub-agent to handle part of the work.')
+            .addToggle((t) =>
+                t.setValue(this.plugin.settings.autoApproval.subtasks).onChange(async (v) => {
+                    this.plugin.settings.autoApproval.subtasks = v;
+                    await this.plugin.saveSettings();
+                }),
+            );
+
+        new Setting(container)
+            .setName('Follow-up questions')
+            .setDesc('ask_followup_question — show question card directly without an approval step.')
+            .addToggle((t) =>
+                t.setValue(this.plugin.settings.autoApproval.question).onChange(async (v) => {
+                    this.plugin.settings.autoApproval.question = v;
+                    await this.plugin.saveSettings();
+                }),
+            );
+
+        new Setting(container)
+            .setName('Todo list updates')
+            .setDesc('update_todo_list — agent publishes a task checklist visible in the chat.')
+            .addToggle((t) =>
+                t.setValue(this.plugin.settings.autoApproval.todo).onChange(async (v) => {
+                    this.plugin.settings.autoApproval.todo = v;
                     await this.plugin.saveSettings();
                 }),
             );
@@ -2211,6 +2315,26 @@ export class AgentSettingsTab extends PluginSettingTab {
             .addToggle((t) =>
                 t.setValue(this.plugin.settings.showWelcomeMessage).onChange(async (v) => {
                     this.plugin.settings.showWelcomeMessage = v;
+                    await this.plugin.saveSettings();
+                }),
+            );
+
+        new Setting(container)
+            .setName('Send with Enter')
+            .setDesc('Press Enter to send a message; Shift+Enter adds a newline. When off, use Ctrl/Cmd+Enter to send.')
+            .addToggle((t) =>
+                t.setValue(this.plugin.settings.sendWithEnter ?? true).onChange(async (v) => {
+                    this.plugin.settings.sendWithEnter = v;
+                    await this.plugin.saveSettings();
+                }),
+            );
+
+        new Setting(container)
+            .setName('Include current date and time in context')
+            .setDesc('Prepend today\'s date and time to the system prompt so the agent knows when it is.')
+            .addToggle((t) =>
+                t.setValue(this.plugin.settings.includeCurrentTimeInContext ?? true).onChange(async (v) => {
+                    this.plugin.settings.includeCurrentTimeInContext = v;
                     await this.plugin.saveSettings();
                 }),
             );
