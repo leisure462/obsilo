@@ -15,7 +15,7 @@
 
 import git from 'isomorphic-git';
 import fs from 'fs';
-import { TFile, type App, type FileSystemAdapter, type Vault } from 'obsidian';
+import { TFile, TFolder, type App, type FileSystemAdapter, type Vault } from 'obsidian';
 
 export interface CheckpointInfo {
     taskId: string;
@@ -33,6 +33,7 @@ export interface RestoreResult {
 }
 
 export class GitCheckpointService {
+    private app: App;
     private vault: Vault;
     /** Absolute filesystem path to the shadow repo */
     private repoPath: string;
@@ -44,7 +45,8 @@ export class GitCheckpointService {
     /** In-memory checkpoint tracking per task (Kilo Code pattern: _checkpoints[]) */
     private taskCheckpoints = new Map<string, CheckpointInfo[]>();
 
-    constructor(vault: Vault, pluginDir: string, timeoutSeconds = 30, autoCleanup = true) {
+    constructor(app: App, vault: Vault, pluginDir: string, timeoutSeconds = 30, autoCleanup = true) {
+        this.app = app;
         this.vault = vault;
         this.repoRelPath = `${pluginDir}/checkpoints`;
         // isomorphic-git needs an absolute path
@@ -226,8 +228,8 @@ export class GitCheckpointService {
             for (const vaultRelPath of checkpoint.newFiles) {
                 try {
                     const file = this.vault.getAbstractFileByPath(vaultRelPath);
-                    if (file) {
-                        await this.vault.delete(file);
+                    if (file && (file instanceof TFile || file instanceof TFolder)) {
+                        await this.app.fileManager.trashFile(file);
                         restored.push(vaultRelPath);
                     }
                 } catch (e) {

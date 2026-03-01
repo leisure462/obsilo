@@ -31,7 +31,7 @@ import { findAllowedMethod } from '../tools/agent/pluginApiAllowlist';
  * NOT the same as the mode-level ToolGroup in settings.ts (which controls
  * tool availability per mode). This type controls the approval/governance path.
  */
-type ApprovalGroup = 'read' | 'note-edit' | 'vault-change' | 'web' | 'agent' | 'mode' | 'subtask' | 'mcp' | 'skill' | 'plugin-api' | 'recipe' | 'sandbox' | 'self-modify';
+type ApprovalGroup = 'read' | 'note-edit' | 'vault-change' | 'web' | 'agent' | 'subtask' | 'mcp' | 'skill' | 'plugin-api' | 'recipe' | 'sandbox' | 'self-modify';
 
 const TOOL_GROUPS: Record<string, ApprovalGroup> = {
     // Read-only vault tools
@@ -65,8 +65,8 @@ const TOOL_GROUPS: Record<string, ApprovalGroup> = {
     attempt_completion: 'agent',
     update_todo_list: 'agent',
     open_note: 'agent',
-    // Mode switching (respects autoApproval.mode)
-    switch_mode: 'mode',
+    // Mode switching (always auto-approved, agent-internal)
+    switch_mode: 'agent',
     // Subtask spawning (respects autoApproval.subtasks)
     new_task: 'subtask',
     // MCP

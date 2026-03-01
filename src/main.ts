@@ -77,6 +77,7 @@ export default class ObsidianAgentPlugin extends Plugin {
     semanticIndex: SemanticIndexService | null = null;
     private autoIndexDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
     private warmupFired = false;
+    private cloudProviderWarningShown = false;
     chatHistoryService: ChatHistoryService | null = null;
     conversationStore: ConversationStore | null = null;
     memoryService: MemoryService | null = null;
@@ -191,6 +192,7 @@ export default class ObsidianAgentPlugin extends Plugin {
 
         // Checkpoints (isomorphic-git shadow repo)
         this.checkpointService = new GitCheckpointService(
+            this.app,
             this.app.vault,
             pluginDir,
             this.settings.checkpointTimeoutSeconds,
@@ -658,6 +660,20 @@ export default class ObsidianAgentPlugin extends Plugin {
         if (!key) return null;
         const model = this.settings.activeModels.find((m) => getModelKey(m) === key);
         if (!model || !model.enabled) return null;
+
+        // M-6: One-time privacy notice when using a cloud provider
+        if (!this.cloudProviderWarningShown) {
+            const cloudProviders = ['anthropic', 'openai', 'openrouter', 'azure'];
+            if (cloudProviders.includes(model.provider)) {
+                this.cloudProviderWarningShown = true;
+                console.debug(
+                    `[Agent] Cloud provider "${model.provider}" selected. ` +
+                    'Vault content sent to the agent will be transmitted to external servers. ' +
+                    'For privacy-sensitive vaults, consider using a local provider (ollama, lmstudio).',
+                );
+            }
+        }
+
         return model;
     }
 

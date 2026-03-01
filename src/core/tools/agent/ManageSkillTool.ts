@@ -24,6 +24,7 @@ import type { ToolRegistry } from '../ToolRegistry';
 import { CodeModuleCompiler } from '../../skills/CodeModuleCompiler';
 import type { CodeModuleInput } from '../../skills/CodeModuleCompiler';
 import { AstValidator } from '../../sandbox/AstValidator';
+import { safeRegex } from '../../utils/safeRegex';
 
 // ---------------------------------------------------------------------------
 // Input
@@ -348,7 +349,12 @@ export class ManageSkillTool extends BaseTool<'manage_skill'> {
         if (!skill.body || skill.body.length < 10) issues.push('Body too short (should describe steps)');
 
         try {
-            new RegExp(skill.triggerSource);
+            const compiled = safeRegex(skill.triggerSource, 'i');
+            // safeRegex falls back to literal match for complex/ReDoS-prone patterns
+            const literalEscaped = skill.triggerSource.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            if (compiled.source === literalEscaped && skill.triggerSource !== literalEscaped) {
+                issues.push(`Trigger regex simplified to literal match (too complex): ${skill.triggerSource}`);
+            }
         } catch {
             issues.push(`Invalid trigger regex: ${skill.triggerSource}`);
         }

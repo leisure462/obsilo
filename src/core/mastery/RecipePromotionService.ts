@@ -120,19 +120,34 @@ Generate a JSON object with:
                 if (chunk.type === 'text') responseText += chunk.text;
             }
 
-            // Parse LLM response
-            const parsed = JSON.parse(responseText.trim());
-            if (!parsed.name || !parsed.trigger || !parsed.steps) {
-                console.warn('[RecipePromotion] Invalid LLM response, skipping');
+            // Parse LLM response (M-9: type-guarded validation)
+            const raw: unknown = JSON.parse(responseText.trim());
+            if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+                console.warn('[RecipePromotion] LLM response is not an object, skipping');
+                return;
+            }
+            const parsed = raw as Record<string, unknown>;
+            if (typeof parsed.name !== 'string' || typeof parsed.trigger !== 'string' || !Array.isArray(parsed.steps)) {
+                console.warn('[RecipePromotion] Invalid LLM response structure, skipping');
+                return;
+            }
+            const validSteps = (parsed.steps as unknown[]).filter(
+                (s): s is { tool: string; note: string } =>
+                    typeof s === 'object' && s !== null &&
+                    typeof (s as Record<string, unknown>).tool === 'string' &&
+                    typeof (s as Record<string, unknown>).note === 'string',
+            );
+            if (validSteps.length === 0) {
+                console.warn('[RecipePromotion] No valid steps in LLM response, skipping');
                 return;
             }
 
             const recipe: ProceduralRecipe = {
                 id: `learned-${pattern.patternKey}`,
-                name: String(parsed.name).slice(0, 40),
-                description: String(parsed.description ?? '').slice(0, 100),
-                trigger: String(parsed.trigger).slice(0, 200),
-                steps: (parsed.steps as Array<{ tool: string; note: string }>).map((s) => ({
+                name: parsed.name.slice(0, 40),
+                description: typeof parsed.description === 'string' ? parsed.description.slice(0, 100) : '',
+                trigger: parsed.trigger.slice(0, 200),
+                steps: validSteps.map((s) => ({
                     tool: String(s.tool),
                     note: String(s.note),
                 })),

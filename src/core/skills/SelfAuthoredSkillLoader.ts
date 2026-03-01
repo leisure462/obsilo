@@ -406,11 +406,11 @@ export class SelfAuthoredSkillLoader {
         // Try to remove empty directories
         const compiledDir = this.plugin.app.vault.getAbstractFileByPath(`${skillDir}/code-compiled`);
         if (compiledDir instanceof TFolder && compiledDir.children.length === 0) {
-            await this.plugin.app.vault.delete(compiledDir);
+            await this.plugin.app.fileManager.trashFile(compiledDir);
         }
         const codeDir = this.plugin.app.vault.getAbstractFileByPath(`${skillDir}/code`);
         if (codeDir instanceof TFolder && codeDir.children.length === 0) {
-            await this.plugin.app.vault.delete(codeDir);
+            await this.plugin.app.fileManager.trashFile(codeDir);
         }
     }
 
@@ -535,9 +535,15 @@ export class SelfAuthoredSkillLoader {
                         .replace(/'/g, '"')
                         .replace(/(\w+)\s*:/g, '"$1":')
                         .replace(/,(\s*[}\]])/g, '$1');
-                    const parsed = JSON.parse(jsonStr) as CodeModuleInfo['inputSchema'];
-                    if (parsed && typeof parsed === 'object' && parsed.type === 'object') {
-                        inputSchema = parsed;
+                    const raw: unknown = JSON.parse(jsonStr);
+                    if (
+                        raw !== null && typeof raw === 'object' &&
+                        'type' in raw && (raw as Record<string, unknown>).type === 'object'
+                    ) {
+                        const candidate = raw as Record<string, unknown>;
+                        if (!candidate.properties || typeof candidate.properties === 'object') {
+                            inputSchema = raw as CodeModuleInfo['inputSchema'];
+                        }
                     }
                 } catch {
                     // Schema parsing failed — use defaults

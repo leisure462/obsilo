@@ -379,7 +379,11 @@ export interface MemorySettings {
 // ---------------------------------------------------------------------------
 
 export interface ObsidianAgentSettings {
-    // Model management (new — replaces providers/defaultProvider)
+    /**
+     * Configured LLM models. Cloud providers (anthropic, openai, openrouter, azure)
+     * send vault content to external servers. For privacy-sensitive vaults, prefer
+     * local providers (ollama, lmstudio).
+     */
     activeModels: CustomModel[];
     activeModelKey: string;
 

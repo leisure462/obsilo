@@ -7,9 +7,38 @@
  */
 
 import { requestUrl } from 'obsidian';
+import dns from 'dns';
 import { BaseTool } from '../BaseTool';
 import type { ToolDefinition, ToolExecutionContext } from '../types';
 import type ObsidianAgentPlugin from '../../../main';
+
+/**
+ * Check whether an IP address belongs to a private/internal network range.
+ * Covers RFC 1918, loopback, link-local, and IPv6 equivalents.
+ */
+function isPrivateIP(ip: string): boolean {
+    // IPv4
+    if (ip.includes('.')) {
+        const parts = ip.split('.').map(Number);
+        if (parts.length !== 4 || parts.some((p) => isNaN(p))) return false;
+        const [a, b] = parts;
+        return (
+            a === 127 ||             // 127.0.0.0/8  loopback
+            a === 10 ||              // 10.0.0.0/8   RFC 1918
+            (a === 172 && b >= 16 && b <= 31) || // 172.16.0.0/12 RFC 1918
+            (a === 192 && b === 168) ||          // 192.168.0.0/16 RFC 1918
+            (a === 169 && b === 254) ||          // 169.254.0.0/16 link-local / AWS metadata
+            a === 0                  // 0.0.0.0/8    "this" network
+        );
+    }
+    // IPv6
+    const norm = ip.toLowerCase();
+    return (
+        norm === '::1' ||                   // loopback
+        norm.startsWith('fe80') ||          // link-local fe80::/10
+        /^f[cd][0-9a-f]{2}:/.test(norm)    // unique-local fc00::/7
+    );
+}
 
 interface WebFetchInput {
     url: string;
@@ -69,34 +98,46 @@ export class WebFetchTool extends BaseTool<'web_fetch'> {
             return;
         }
 
-        // H-3: Block SSRF — deny access to private/internal network addresses.
-        // NOTE (M-5): This check validates the hostname string before DNS resolution.
-        // A DNS rebinding attack could bypass this by resolving to a public IP during
-        // the check and rebinding to 127.0.0.1 during the actual request. Electron's
-        // requestUrl resolves DNS independently. For enterprise deployments, consider
-        // using a DNS-over-HTTPS resolver with pinning, or restrict outbound network.
+        // H-3 + M-2: Block SSRF with two-phase check.
+        // Phase 1: Reject obviously private hostnames (fast, no DNS).
+        // Phase 2: Resolve DNS and reject private resolved IPs (catches rebinding).
+        // TOCTOU note: requestUrl() resolves DNS independently, so a fast rebinding
+        // between our check and the actual request is theoretically possible but
+        // requires sub-second DNS TTL manipulation. This raises the bar significantly.
+        let parsedUrl: URL;
         try {
-            const parsed = new URL(url);
-            const host = parsed.hostname.toLowerCase();
-            const isPrivate =
-                host === 'localhost' ||
-                /^127\./.test(host) ||
-                /^10\./.test(host) ||
-                /^192\.168\./.test(host) ||
-                /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
-                /^169\.254\./.test(host) ||   // link-local / AWS metadata endpoint
-                /^0\./.test(host) ||
-                host === '::1' ||
-                /^fc[0-9a-f]{2}:/i.test(host);  // IPv6 unique-local
-            if (isPrivate) {
+            parsedUrl = new URL(url);
+        } catch {
+            callbacks.pushToolResult(this.formatError(new Error('Invalid URL')));
+            return;
+        }
+
+        const host = parsedUrl.hostname.toLowerCase();
+
+        // Phase 1: Block obviously private hostnames
+        if (host === 'localhost' || isPrivateIP(host)) {
+            callbacks.pushToolResult(
+                this.formatError(new Error('Access to private/internal network addresses is not allowed'))
+            );
+            return;
+        }
+
+        // Phase 2: Resolve DNS and check resolved IPs
+        try {
+            const ips = await this.resolveHost(host);
+            const privateIp = ips.find(isPrivateIP);
+            if (privateIp) {
                 callbacks.pushToolResult(
-                    this.formatError(new Error('Access to private/internal network addresses is not allowed'))
+                    this.formatError(new Error(
+                        `Hostname "${host}" resolves to private IP ${privateIp} — access denied (SSRF protection)`
+                    ))
                 );
                 return;
             }
         } catch {
-            callbacks.pushToolResult(this.formatError(new Error('Invalid URL')));
-            return;
+            // DNS resolution failed — could be IP literal or non-resolvable host.
+            // IP literals are already checked in Phase 1. For non-resolvable hosts,
+            // let requestUrl() handle the error naturally.
         }
 
         try {
@@ -167,6 +208,33 @@ export class WebFetchTool extends BaseTool<'web_fetch'> {
         } catch (error) {
             callbacks.pushToolResult(this.formatError(error));
         }
+    }
+
+    // ---------------------------------------------------------------------------
+    // DNS resolution helper (M-2: anti-rebinding)
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Resolve a hostname to its IPv4 and IPv6 addresses.
+     * Used to detect DNS rebinding (hostname resolves to private IP).
+     */
+    private async resolveHost(hostname: string): Promise<string[]> {
+        const results: string[] = [];
+        const resolver = new dns.promises.Resolver();
+        // Short timeout — we don't want to delay the user for DNS issues
+        resolver.setServers(['8.8.8.8', '1.1.1.1']);
+
+        try {
+            const ipv4 = await resolver.resolve4(hostname);
+            results.push(...ipv4);
+        } catch { /* no A records — ok */ }
+
+        try {
+            const ipv6 = await resolver.resolve6(hostname);
+            results.push(...ipv6);
+        } catch { /* no AAAA records — ok */ }
+
+        return results;
     }
 
     // ---------------------------------------------------------------------------

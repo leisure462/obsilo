@@ -11,6 +11,10 @@
  * - 'rollback': Restore main.js from backup
  *
  * Part of Self-Development Phase 4: Core Self-Modification.
+ *
+ * SECURITY (M-7/CWE-269): This tool is classified as 'self-modify' in
+ * ToolExecutionPipeline, which ALWAYS requires manual user approval.
+ * There is no auto-approve bypass. Only available in Agent mode.
  */
 
 import { BaseTool } from '../BaseTool';

@@ -64,7 +64,7 @@ export class DeleteFileTool extends BaseTool<'delete_file'> {
             }
 
             // Use Obsidian's trash (moves to .trash in vault or OS trash)
-            await this.app.vault.trash(item, true);
+            await this.app.fileManager.trashFile(item);
 
             const type = isFolder ? 'Folder' : 'File';
             callbacks.pushToolResult(this.formatSuccess(`${type} moved to trash: ${path}`));

@@ -18,7 +18,7 @@
  * Part of Self-Development Phase 3: Sandbox + Dynamic Modules.
  */
 
-import { requestUrl } from 'obsidian';
+import { Notice, requestUrl } from 'obsidian';
 import type ObsidianAgentPlugin from '../../main';
 
 // ---------------------------------------------------------------------------
@@ -69,6 +69,8 @@ export class EsbuildWasmManager {
     private packageCache = new Map<string, string>();
     private readonly cacheDir: string;
     private initializing = false;
+    /** Track packages for which a CDN download notice has already been shown (per session). */
+    private notifiedPackages = new Set<string>();
 
     constructor(private plugin: ObsidianAgentPlugin) {
         const configDir = plugin.app.vault.configDir;
@@ -308,9 +310,20 @@ export class EsbuildWasmManager {
      * After downloading, resolves absolute-path imports recursively so that
      * sub-dependencies (e.g. pptxgenjs → jszip, or esm.sh Node polyfills)
      * are also available in the virtual filesystem.
+     *
+     * SECURITY (M-5): Downloads run arbitrary third-party code in the sandbox.
+     * A Notice is shown on first download of each package so the user is aware.
      */
     private async ensurePackage(name: string): Promise<void> {
         if (this.packageCache.has(name)) return;
+
+        // M-5: Notify user about CDN download (once per package per session)
+        if (!this.notifiedPackages.has(name)) {
+            this.notifiedPackages.add(name);
+            console.warn(`[EsbuildWasmManager] Downloading npm package "${name}" from CDN for sandbox execution`);
+            // eslint-disable-next-line no-new -- fire-and-forget UI notification
+            new Notice(`Sandbox: Downloading "${name}" from CDN`, 5000);
+        }
 
         // Prefer esm.sh ?bundle — includes all transitive dependencies in one file
         const bundleUrl = `https://esm.sh/${name}?bundle`;

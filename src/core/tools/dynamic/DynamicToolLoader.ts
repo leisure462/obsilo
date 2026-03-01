@@ -194,7 +194,7 @@ ${record.sourceTs}
                     try {
                         const dir = this.plugin.app.vault.getAbstractFileByPath(folderPath);
                         if (dir instanceof TFolder && dir.children.length === 0) {
-                            await this.plugin.app.vault.delete(dir);
+                            await this.plugin.app.fileManager.trashFile(dir);
                         }
                     } catch {
                         // Non-fatal: folder may not be empty
