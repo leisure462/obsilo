@@ -529,6 +529,14 @@ export default class ObsidianAgentPlugin extends Plugin {
         ap.noteEdits = ap.noteEdits ?? false;
         ap.vaultChanges = ap.vaultChanges ?? false;
         ap.skills = ap.skills ?? false;
+        // Deep-merge autoApproval: new keys from DEFAULT_SETTINGS are applied
+        // so the UI always reflects the actual effective value (WYSIWYG).
+        const apDefaults = DEFAULT_SETTINGS.autoApproval;
+        for (const key of Object.keys(apDefaults) as Array<keyof typeof apDefaults>) {
+            if ((ap as unknown as Record<string, unknown>)[key] === undefined) {
+                (ap as unknown as Record<string, unknown>)[key] = apDefaults[key];
+            }
+        }
         // Migrate: chatHistoryFolder → enableChatHistory
         if (this.settings.chatHistoryFolder && this.settings.enableChatHistory === undefined) {
             this.settings.enableChatHistory = true;
@@ -584,11 +592,6 @@ export default class ObsidianAgentPlugin extends Plugin {
         {
             const ap = this.settings.autoApproval;
             let changed = false;
-            // skills: was false, now true — enable when master switch is on
-            if (ap.enabled && ap.skills === false) {
-                ap.skills = true;
-                changed = true;
-            }
             // pluginApiRead: may be missing in older data.json — default true
             if (ap.pluginApiRead === undefined) {
                 ap.pluginApiRead = true;

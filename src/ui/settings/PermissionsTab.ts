@@ -12,7 +12,8 @@ export class PermissionsTab {
             text: t('settings.permissions.desc'),
         });
 
-        containerEl.createEl('h3', { cls: 'agent-settings-section', text: t('settings.permissions.headingGeneral') });
+        // ── Auto-approve (master toggle + categories) ────────────────────
+        containerEl.createEl('h3', { cls: 'agent-settings-section', text: t('settings.permissions.headingAutoApprove') });
 
         new Setting(containerEl)
             .setName(t('settings.permissions.enableAutoApprove'))
@@ -21,9 +22,10 @@ export class PermissionsTab {
                 t.setValue(this.plugin.settings.autoApproval.enabled).onChange(async (v) => {
                     this.plugin.settings.autoApproval.enabled = v;
                     await this.plugin.saveSettings();
+                    this.updateCategoryState(categoryContainer, v);
                 }),
             );
-        this.addWarning(containerEl, 'settings.permissions.enableAutoApproveWarning');
+        this.addWarning(containerEl, 'settings.permissions.enableAutoApproveWarning', true);
 
         new Setting(containerEl)
             .setName(t('settings.permissions.showApprovalBar'))
@@ -35,9 +37,15 @@ export class PermissionsTab {
                 }),
             );
 
-        containerEl.createEl('h3', { cls: 'agent-settings-section', text: t('settings.permissions.headingPerCategory') });
+        // Container for all category toggles — disabled when master is off
+        const categoryContainer = containerEl.createDiv('agent-approval-categories');
 
-        new Setting(containerEl)
+        categoryContainer.createEl('h3', {
+            cls: 'agent-settings-section',
+            text: t('settings.permissions.headingPerCategory'),
+        });
+
+        new Setting(categoryContainer)
             .setName(t('settings.permissions.readOps'))
             .setDesc(t('settings.permissions.readOpsDesc'))
             .addToggle((t) =>
@@ -47,7 +55,7 @@ export class PermissionsTab {
                 }),
             );
 
-        new Setting(containerEl)
+        new Setting(categoryContainer)
             .setName(t('settings.permissions.noteEdits'))
             .setDesc(t('settings.permissions.noteEditsDesc'))
             .addToggle((t) =>
@@ -56,9 +64,9 @@ export class PermissionsTab {
                     await this.plugin.saveSettings();
                 }),
             );
-        this.addWarning(containerEl, 'settings.permissions.noteEditsWarning');
+        this.addWarning(categoryContainer, 'settings.permissions.noteEditsWarning');
 
-        new Setting(containerEl)
+        new Setting(categoryContainer)
             .setName(t('settings.permissions.vaultChanges'))
             .setDesc(t('settings.permissions.vaultChangesDesc'))
             .addToggle((t) =>
@@ -67,9 +75,20 @@ export class PermissionsTab {
                     await this.plugin.saveSettings();
                 }),
             );
-        this.addWarning(containerEl, 'settings.permissions.vaultChangesWarning');
+        this.addWarning(categoryContainer, 'settings.permissions.vaultChangesWarning');
 
-        new Setting(containerEl)
+        new Setting(categoryContainer)
+            .setName(t('settings.permissions.webOps'))
+            .setDesc(t('settings.permissions.webOpsDesc'))
+            .addToggle((t) =>
+                t.setValue(this.plugin.settings.autoApproval.web).onChange(async (v) => {
+                    this.plugin.settings.autoApproval.web = v;
+                    await this.plugin.saveSettings();
+                }),
+            );
+        this.addWarning(categoryContainer, 'settings.permissions.webOpsWarning');
+
+        new Setting(categoryContainer)
             .setName(t('settings.permissions.mcpCalls'))
             .setDesc(t('settings.permissions.mcpCallsDesc'))
             .addToggle((t) =>
@@ -78,19 +97,9 @@ export class PermissionsTab {
                     await this.plugin.saveSettings();
                 }),
             );
-        this.addWarning(containerEl, 'settings.permissions.mcpCallsWarning');
+        this.addWarning(categoryContainer, 'settings.permissions.mcpCallsWarning');
 
-        new Setting(containerEl)
-            .setName(t('settings.permissions.modeSwitching'))
-            .setDesc(t('settings.permissions.modeSwitchingDesc'))
-            .addToggle((t) =>
-                t.setValue(this.plugin.settings.autoApproval.mode).onChange(async (v) => {
-                    this.plugin.settings.autoApproval.mode = v;
-                    await this.plugin.saveSettings();
-                }),
-            );
-
-        new Setting(containerEl)
+        new Setting(categoryContainer)
             .setName(t('settings.permissions.subtasks'))
             .setDesc(t('settings.permissions.subtasksDesc'))
             .addToggle((t) =>
@@ -99,29 +108,9 @@ export class PermissionsTab {
                     await this.plugin.saveSettings();
                 }),
             );
-        this.addWarning(containerEl, 'settings.permissions.subtasksWarning');
+        this.addWarning(categoryContainer, 'settings.permissions.subtasksWarning');
 
-        new Setting(containerEl)
-            .setName(t('settings.permissions.followUp'))
-            .setDesc(t('settings.permissions.followUpDesc'))
-            .addToggle((t) =>
-                t.setValue(this.plugin.settings.autoApproval.question).onChange(async (v) => {
-                    this.plugin.settings.autoApproval.question = v;
-                    await this.plugin.saveSettings();
-                }),
-            );
-
-        new Setting(containerEl)
-            .setName(t('settings.permissions.todoUpdates'))
-            .setDesc(t('settings.permissions.todoUpdatesDesc'))
-            .addToggle((t) =>
-                t.setValue(this.plugin.settings.autoApproval.todo).onChange(async (v) => {
-                    this.plugin.settings.autoApproval.todo = v;
-                    await this.plugin.saveSettings();
-                }),
-            );
-
-        new Setting(containerEl)
+        new Setting(categoryContainer)
             .setName(t('settings.permissions.pluginSkills'))
             .setDesc(t('settings.permissions.pluginSkillsDesc'))
             .addToggle((t) =>
@@ -131,9 +120,9 @@ export class PermissionsTab {
                 }),
             );
 
-        containerEl.createEl('h3', { cls: 'agent-settings-section', text: t('settings.permissions.headingPluginApi') });
+        categoryContainer.createEl('h3', { cls: 'agent-settings-section', text: t('settings.permissions.headingPluginApi') });
 
-        new Setting(containerEl)
+        new Setting(categoryContainer)
             .setName(t('settings.permissions.pluginApiReads'))
             .setDesc(t('settings.permissions.pluginApiReadsDesc'))
             .addToggle((t) =>
@@ -143,7 +132,7 @@ export class PermissionsTab {
                 }),
             );
 
-        new Setting(containerEl)
+        new Setting(categoryContainer)
             .setName(t('settings.permissions.pluginApiWrites'))
             .setDesc(t('settings.permissions.pluginApiWritesDesc'))
             .addToggle((t) =>
@@ -152,9 +141,9 @@ export class PermissionsTab {
                     await this.plugin.saveSettings();
                 }),
             );
-        this.addWarning(containerEl, 'settings.permissions.pluginApiWritesWarning');
+        this.addWarning(categoryContainer, 'settings.permissions.pluginApiWritesWarning');
 
-        new Setting(containerEl)
+        new Setting(categoryContainer)
             .setName(t('settings.permissions.recipes'))
             .setDesc(t('settings.permissions.recipesDesc'))
             .addToggle((t) =>
@@ -163,17 +152,16 @@ export class PermissionsTab {
                     await this.plugin.saveSettings();
                 }),
             );
-        this.addWarning(containerEl, 'settings.permissions.recipesWarning');
+        this.addWarning(categoryContainer, 'settings.permissions.recipesWarning', true);
 
-        containerEl.createEl('h3', { cls: 'agent-settings-section', text: t('settings.permissions.headingSandbox') });
+        categoryContainer.createEl('h3', { cls: 'agent-settings-section', text: t('settings.permissions.headingSandbox') });
 
-        new Setting(containerEl)
+        new Setting(categoryContainer)
             .setName(t('settings.permissions.sandbox'))
             .setDesc(t('settings.permissions.sandboxDesc'))
             .addToggle((toggle) =>
                 toggle.setValue(this.plugin.settings.autoApproval.sandbox ?? false).onChange(async (v) => {
                     if (v) {
-                        // Require explicit confirmation before enabling sandbox auto-approval
                         const confirmed = await this.confirmHighRisk(
                             t('settings.permissions.sandboxConfirmTitle'),
                             t('settings.permissions.sandboxConfirmMessage'),
@@ -187,7 +175,15 @@ export class PermissionsTab {
                     await this.plugin.saveSettings();
                 }),
             );
-        this.addWarning(containerEl, 'settings.permissions.sandboxWarning');
+        this.addWarning(categoryContainer, 'settings.permissions.sandboxWarning', true);
+
+        // Set initial disabled state
+        this.updateCategoryState(categoryContainer, this.plugin.settings.autoApproval.enabled);
+    }
+
+    /** Toggle the disabled state of all category toggles. */
+    private updateCategoryState(container: HTMLElement, enabled: boolean): void {
+        container.toggleClass('agent-approval-categories--disabled', !enabled);
     }
 
     /**
@@ -220,8 +216,9 @@ export class PermissionsTab {
     }
 
     /** Render a security warning callout below a settings toggle. */
-    private addWarning(containerEl: HTMLElement, key: string): void {
-        const warnEl = containerEl.createDiv('agent-setting-warning');
+    private addWarning(containerEl: HTMLElement, key: string, highRisk = false): void {
+        const cls = highRisk ? 'agent-setting-warning agent-setting-warning--high-risk' : 'agent-setting-warning';
+        const warnEl = containerEl.createDiv(cls);
         const iconEl = warnEl.createSpan('agent-setting-warning-icon');
         setIcon(iconEl, 'alert-triangle');
         warnEl.createSpan({ text: t(key) });

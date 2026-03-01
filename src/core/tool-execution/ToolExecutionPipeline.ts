@@ -26,7 +26,7 @@ import type { OperationLogger } from '../governance/OperationLogger';
 import { findAllowedMethod } from '../tools/agent/pluginApiAllowlist';
 
 /** Tool group classification for auto-approval checks */
-type ToolGroup = 'read' | 'note-edit' | 'vault-change' | 'web' | 'agent' | 'mode' | 'subtask' | 'mcp' | 'skill' | 'plugin-api' | 'recipe' | 'sandbox' | 'self-modify';
+type ToolGroup = 'read' | 'note-edit' | 'vault-change' | 'web' | 'agent' | 'subtask' | 'mcp' | 'skill' | 'plugin-api' | 'recipe' | 'sandbox' | 'self-modify';
 
 const TOOL_GROUPS: Record<string, ToolGroup> = {
     // Read-only vault tools
@@ -60,8 +60,8 @@ const TOOL_GROUPS: Record<string, ToolGroup> = {
     attempt_completion: 'agent',
     update_todo_list: 'agent',
     open_note: 'agent',
-    // Mode switching (respects autoApproval.mode)
-    switch_mode: 'mode',
+    // Mode switching (always auto-approved, feature toggle only)
+    switch_mode: 'agent',
     // Subtask spawning (respects autoApproval.subtasks)
     new_task: 'subtask',
     // MCP
@@ -186,7 +186,7 @@ export class ToolExecutionPipeline {
             // 3. Auto-approve or request approval for write/mcp/mode/subtask operations
             // Web tools are always auto-approved when webTools.enabled is true (the only way they appear).
             const toolGroup = TOOL_GROUPS[toolCall.name];
-            if (tool.isWriteOperation || toolGroup === 'mcp' || toolGroup === 'mode' || toolGroup === 'subtask' || toolGroup === 'sandbox') {
+            if (tool.isWriteOperation || toolGroup === 'mcp' || toolGroup === 'subtask' || toolGroup === 'sandbox') {
                 const approval = await this.checkApproval(toolCall, extensions);
                 if (approval.decision === 'rejected') {
                     return this.errorResult(toolCall.id, 'Operation denied by user');
@@ -341,8 +341,8 @@ export class ToolExecutionPipeline {
             if (group === 'read' && cfg.read) return { decision: 'auto' };
             if (group === 'note-edit' && cfg.noteEdits) return { decision: 'auto' };
             if (group === 'vault-change' && cfg.vaultChanges) return { decision: 'auto' };
+            if (group === 'web' && cfg.web) return { decision: 'auto' };
             if (group === 'mcp' && cfg.mcp) return { decision: 'auto' };
-            if (group === 'mode' && cfg.mode) return { decision: 'auto' };
             if (group === 'subtask' && cfg.subtasks) return { decision: 'auto' };
             if (group === 'skill' && cfg.skills) return { decision: 'auto' };
             if (group === 'plugin-api') {

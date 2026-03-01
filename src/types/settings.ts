@@ -624,10 +624,10 @@ export const DEFAULT_SETTINGS: ObsidianAgentSettings = {
         subtasks: false,
         question: true,
         todo: true,
-        skills: true,
+        skills: false,
         pluginApiRead: true,
         pluginApiWrite: false,
-        recipes: true,
+        recipes: false,
         sandbox: false,
     },
     autoApprovalRules: {
