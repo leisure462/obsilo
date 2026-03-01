@@ -290,6 +290,16 @@ export const ja: Translations = {
     'settings.permissions.recipesWarning': 'レシピはシステム上でシェルコマンドを実行します。自動承認は実行前の最後の手動チェックを削除します。',
     'settings.permissions.subtasksWarning': 'サブエージェントは自動承認設定を継承し、個別の確認なしでツールを実行できます。',
 
+    // サンドボックス実行
+    'settings.permissions.headingSandbox': 'サンドボックスコード実行',
+    'settings.permissions.sandbox': 'サンドボックス実行を自動承認',
+    'settings.permissions.sandboxDesc': 'サンドボックス化されたiframeで任意のTypeScript/JavaScriptを実行するevaluate_expressionを自動承認します。デフォルトでオフ。サンドボックスはV8オリジン分離を提供しますが、ElectronではOSレベルのプロセス分離は提供しません。ユーザー承認がプロンプトインジェクションコードに対する主要な防御です。',
+    'settings.permissions.sandboxWarning': '高リスク: evaluate_expressionは任意のコードを実行します。Electronではiframeサンドボックスは論理的な分離のみ提供します — V8エンジンのエクスプロイトで脱出可能です。自動承認が有効な場合、プロンプトインジェクションされたコンテンツが未確認のコード実行をトリガーする可能性があります。リスクを完全に理解していない限り、オフのままにしてください。',
+    'settings.permissions.sandboxConfirmTitle': 'サンドボックス自動承認を有効にしますか？',
+    'settings.permissions.sandboxConfirmMessage': 'これにより、エージェントはあなたの確認なしに任意のJavaScript/TypeScriptコードを実行できます。サンドボックスはV8オリジン分離を提供しますが、ElectronではOSレベルのプロセス分離は提供しません。プロンプトインジェクションされたコンテンツ（例：Webページやノート）が未確認のコード実行をトリガーする可能性があります。本当に有効にしますか？',
+    'settings.permissions.sandboxConfirmCancel': 'キャンセル',
+    'settings.permissions.sandboxConfirmAccept': 'リスクを理解しました — 有効にする',
+
     // =========================================================================
     // Settings — Loop Tab
     // =========================================================================

@@ -164,6 +164,59 @@ export class PermissionsTab {
                 }),
             );
         this.addWarning(containerEl, 'settings.permissions.recipesWarning');
+
+        containerEl.createEl('h3', { cls: 'agent-settings-section', text: t('settings.permissions.headingSandbox') });
+
+        new Setting(containerEl)
+            .setName(t('settings.permissions.sandbox'))
+            .setDesc(t('settings.permissions.sandboxDesc'))
+            .addToggle((toggle) =>
+                toggle.setValue(this.plugin.settings.autoApproval.sandbox ?? false).onChange(async (v) => {
+                    if (v) {
+                        // Require explicit confirmation before enabling sandbox auto-approval
+                        const confirmed = await this.confirmHighRisk(
+                            t('settings.permissions.sandboxConfirmTitle'),
+                            t('settings.permissions.sandboxConfirmMessage'),
+                        );
+                        if (!confirmed) {
+                            toggle.setValue(false);
+                            return;
+                        }
+                    }
+                    this.plugin.settings.autoApproval.sandbox = v;
+                    await this.plugin.saveSettings();
+                }),
+            );
+        this.addWarning(containerEl, 'settings.permissions.sandboxWarning');
+    }
+
+    /**
+     * Show a confirmation dialog for high-risk settings.
+     * Returns true if the user confirmed, false otherwise.
+     */
+    private confirmHighRisk(title: string, message: string): Promise<boolean> {
+        return new Promise((resolve) => {
+            const modal = new (class extends (require('obsidian') as typeof import('obsidian')).Modal {
+                onOpen(): void {
+                    const { contentEl } = this;
+                    contentEl.createEl('h3', { text: title });
+                    contentEl.createEl('p', { text: message, cls: 'agent-setting-confirm-message' });
+
+                    const btnRow = contentEl.createDiv('agent-setting-confirm-buttons');
+                    const cancelBtn = btnRow.createEl('button', { text: t('settings.permissions.sandboxConfirmCancel') });
+                    const confirmBtn = btnRow.createEl('button', {
+                        text: t('settings.permissions.sandboxConfirmAccept'),
+                        cls: 'mod-warning',
+                    });
+                    cancelBtn.addEventListener('click', () => { this.close(); resolve(false); });
+                    confirmBtn.addEventListener('click', () => { this.close(); resolve(true); });
+                }
+                onClose(): void {
+                    resolve(false);
+                }
+            })(this.app);
+            modal.open();
+        });
     }
 
     /** Render a security warning callout below a settings toggle. */

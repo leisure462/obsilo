@@ -2724,10 +2724,11 @@ export class AgentSidebarView extends ItemView {
         });
     }
 
-    private getToolGroup(toolName: string): 'note-edit' | 'vault-change' | 'web' | 'mcp' | 'read' | 'mode' | 'subtask' | 'skill' | 'plugin-api' | 'recipe' {
+    private getToolGroup(toolName: string): 'note-edit' | 'vault-change' | 'web' | 'mcp' | 'read' | 'mode' | 'subtask' | 'skill' | 'plugin-api' | 'recipe' | 'sandbox' {
         const readTools = ['read_file', 'list_files', 'search_files', 'get_frontmatter', 'get_linked_notes', 'get_vault_stats', 'search_by_tag', 'get_daily_note', 'query_base', 'semantic_search'];
         const vaultChangeTools = ['create_folder', 'delete_file', 'move_file', 'generate_canvas', 'create_base', 'update_base'];
         const skillTools = ['execute_command', 'enable_plugin', 'resolve_capability_gap'];
+        if (toolName === 'evaluate_expression') return 'sandbox';
         if (['web_fetch', 'web_search'].includes(toolName)) return 'web';
         if (toolName === 'use_mcp_tool') return 'mcp';
         if (readTools.includes(toolName)) return 'read';
@@ -2752,6 +2753,7 @@ export class AgentSidebarView extends ItemView {
             skill: 'skills',
             'plugin-api': 'pluginApiWrite', // "Enable" sets the broader write permission
             recipe: 'recipes',
+            sandbox: 'sandbox',
         };
         return map[group] ?? null;
     }

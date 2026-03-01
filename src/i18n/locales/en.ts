@@ -290,6 +290,16 @@ export const en: Translations = {
     'settings.permissions.recipesWarning': 'Recipes execute shell commands on your system. Auto-approval removes the last manual check before execution.',
     'settings.permissions.subtasksWarning': 'Sub-agents inherit auto-approval settings and can execute tools without individual confirmation.',
 
+    // Sandbox execution
+    'settings.permissions.headingSandbox': 'Sandbox Code Execution',
+    'settings.permissions.sandbox': 'Auto-approve sandbox execution',
+    'settings.permissions.sandboxDesc': 'Auto-approve evaluate_expression which runs arbitrary TypeScript/JavaScript in the sandboxed iframe. Off by default. The sandbox provides V8 origin isolation but not OS-level process isolation in Electron. User approval is the primary defense against prompt-injected code.',
+    'settings.permissions.sandboxWarning': 'HIGH RISK: evaluate_expression executes arbitrary code. In Electron, the iframe sandbox provides logical isolation only — a V8 engine exploit could escape it. With auto-approval enabled, prompt-injected content could trigger unreviewed code execution. Keep this off unless you fully understand the risk.',
+    'settings.permissions.sandboxConfirmTitle': 'Enable sandbox auto-approval?',
+    'settings.permissions.sandboxConfirmMessage': 'This allows the agent to execute arbitrary JavaScript/TypeScript code without your review. The sandbox provides V8 origin isolation but NOT OS-level process isolation in Electron. Prompt-injected content (e.g. from web pages or vault notes) could trigger unreviewed code execution. Are you sure you want to enable this?',
+    'settings.permissions.sandboxConfirmCancel': 'Cancel',
+    'settings.permissions.sandboxConfirmAccept': 'I understand the risk — enable',
+
     // =========================================================================
     // Settings — Loop Tab
     // =========================================================================

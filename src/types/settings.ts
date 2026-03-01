@@ -307,6 +307,8 @@ export interface AutoApprovalConfig {
     pluginApiWrite: boolean;
     /** Auto-approve recipe execution */
     recipes: boolean;
+    /** Auto-approve sandbox code execution (evaluate_expression). Off by default — high risk. */
+    sandbox: boolean;
 }
 
 /** Legacy — kept for backwards compat */
@@ -626,6 +628,7 @@ export const DEFAULT_SETTINGS: ObsidianAgentSettings = {
         pluginApiRead: true,
         pluginApiWrite: false,
         recipes: true,
+        sandbox: false,
     },
     autoApprovalRules: {
         readOperations: true,

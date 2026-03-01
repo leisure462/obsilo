@@ -290,6 +290,16 @@ export const es: Translations = {
     'settings.permissions.recipesWarning': 'Las recetas ejecutan comandos de shell en su sistema. La auto-aprobacion elimina la ultima verificacion manual antes de la ejecucion.',
     'settings.permissions.subtasksWarning': 'Los sub-agentes heredan la configuracion de auto-aprobacion y pueden ejecutar herramientas sin confirmacion individual.',
 
+    // Ejecucion en sandbox
+    'settings.permissions.headingSandbox': 'Ejecucion de codigo en sandbox',
+    'settings.permissions.sandbox': 'Auto-aprobar ejecucion en sandbox',
+    'settings.permissions.sandboxDesc': 'Auto-aprobar evaluate_expression que ejecuta TypeScript/JavaScript arbitrario en el iframe sandbox. Desactivado por defecto. El sandbox proporciona aislamiento de origen V8 pero no aislamiento de proceso a nivel de SO en Electron. La aprobacion del usuario es la defensa principal contra codigo inyectado por prompt.',
+    'settings.permissions.sandboxWarning': 'ALTO RIESGO: evaluate_expression ejecuta codigo arbitrario. En Electron, el sandbox del iframe solo proporciona aislamiento logico — un exploit del motor V8 podria escapar de el. Con auto-aprobacion habilitada, contenido inyectado por prompt podria desencadenar ejecucion de codigo sin revision. Mantenga desactivado a menos que comprenda completamente el riesgo.',
+    'settings.permissions.sandboxConfirmTitle': 'Habilitar auto-aprobacion de sandbox?',
+    'settings.permissions.sandboxConfirmMessage': 'Esto permite al agente ejecutar codigo JavaScript/TypeScript arbitrario sin su revision. El sandbox proporciona aislamiento de origen V8 pero NO aislamiento de proceso a nivel de SO en Electron. Contenido inyectado por prompt (ej. desde paginas web o notas del vault) podria desencadenar ejecucion de codigo sin revision. Esta seguro de que desea habilitar esto?',
+    'settings.permissions.sandboxConfirmCancel': 'Cancelar',
+    'settings.permissions.sandboxConfirmAccept': 'Entiendo el riesgo — habilitar',
+
     // =========================================================================
     // Settings — Loop Tab
     // =========================================================================

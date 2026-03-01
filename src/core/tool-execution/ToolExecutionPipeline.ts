@@ -26,7 +26,7 @@ import type { OperationLogger } from '../governance/OperationLogger';
 import { findAllowedMethod } from '../tools/agent/pluginApiAllowlist';
 
 /** Tool group classification for auto-approval checks */
-type ToolGroup = 'read' | 'note-edit' | 'vault-change' | 'web' | 'agent' | 'mode' | 'subtask' | 'mcp' | 'skill' | 'plugin-api' | 'recipe' | 'self-modify';
+type ToolGroup = 'read' | 'note-edit' | 'vault-change' | 'web' | 'agent' | 'mode' | 'subtask' | 'mcp' | 'skill' | 'plugin-api' | 'recipe' | 'sandbox' | 'self-modify';
 
 const TOOL_GROUPS: Record<string, ToolGroup> = {
     // Read-only vault tools
@@ -79,8 +79,8 @@ const TOOL_GROUPS: Record<string, ToolGroup> = {
     // Self-Development (Phase 1)
     read_agent_logs: 'agent',
     manage_mcp_server: 'agent',
-    // Self-Development (Phase 2+3)
-    evaluate_expression: 'agent',
+    // Self-Development (Phase 2+3) — sandbox: always requires approval by default
+    evaluate_expression: 'sandbox',
     // M-7: Self-modification tools always require human approval
     manage_skill: 'self-modify',
     manage_source: 'self-modify',
@@ -186,7 +186,7 @@ export class ToolExecutionPipeline {
             // 3. Auto-approve or request approval for write/mcp/mode/subtask operations
             // Web tools are always auto-approved when webTools.enabled is true (the only way they appear).
             const toolGroup = TOOL_GROUPS[toolCall.name];
-            if (tool.isWriteOperation || toolGroup === 'mcp' || toolGroup === 'mode' || toolGroup === 'subtask') {
+            if (tool.isWriteOperation || toolGroup === 'mcp' || toolGroup === 'mode' || toolGroup === 'subtask' || toolGroup === 'sandbox') {
                 const approval = await this.checkApproval(toolCall, extensions);
                 if (approval.decision === 'rejected') {
                     return this.errorResult(toolCall.id, 'Operation denied by user');
@@ -313,6 +313,18 @@ export class ToolExecutionPipeline {
 
         // Agent tools (question, todo, completion, open_note) are always auto-approved
         if (group === 'agent') return { decision: 'auto' };
+
+        // Sandbox code execution (evaluate_expression) — requires explicit opt-in.
+        // Default off because sandboxed code runs arbitrary JS/TS which could be
+        // injected via prompt injection. User approval is the primary defense.
+        if (group === 'sandbox') {
+            if (cfg.enabled && cfg.sandbox) return { decision: 'auto' };
+            if (!extensions?.onApprovalRequired) {
+                console.warn(`[Pipeline] Sandbox tool ${toolCall.name} — denying (requires approval)`);
+                return { decision: 'rejected' };
+            }
+            return await extensions.onApprovalRequired(toolCall.name, toolCall.input);
+        }
 
         // M-7: Self-modification tools (manage_source, manage_skill) ALWAYS require
         // human approval — no auto-approve bypass possible
