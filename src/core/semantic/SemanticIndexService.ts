@@ -522,7 +522,7 @@ export class SemanticIndexService {
     private static tokenize(text: string): string[] {
         return text
             .toLowerCase()
-            .split(/[\s\-_/,.;:!?()[]{}"'`|@#=+*<>~^]+/)
+            .split(/[\s\-_/,.;:!?()\[\]{}"'`|@#=+*<>~^]+/)
             .filter((t) => t.length >= 3)
             .map((t) => SemanticIndexService.stemWord(t));
     }

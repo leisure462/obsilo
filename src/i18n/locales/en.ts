@@ -699,7 +699,7 @@ export const en: Translations = {
     // =========================================================================
     // Chat UI — Sidebar
     // =========================================================================
-    'ui.sidebar.title': 'Obsilo agent',
+    'ui.sidebar.title': 'Obsilo Agent',
     'ui.sidebar.settings': 'Settings',
     'ui.sidebar.chatHistory': 'Chat history',
     'ui.sidebar.newChat': 'New chat',
