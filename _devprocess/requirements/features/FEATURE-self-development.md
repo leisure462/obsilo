@@ -73,9 +73,14 @@ Promise.resolve().then.constructor('return process')()
 
 Obsidian-Plugins laufen mit `nodeIntegration: true`. Code der aus vm ausbricht hat **vollen Zugriff auf Dateisystem, Netzwerk, Prozesse**.
 
-### 2.2 Chromium iframe Sandbox
+### 2.2 Sandbox-Architektur (Hybrid, aktualisiert 2026-03-02)
 
-Die primaere Sicherheitsgrenze ist `<iframe sandbox="allow-scripts">`:
+> **Update:** Die iframe-Sandbox ist jetzt das Mobile-Fallback. Desktop nutzt
+> `child_process.fork()` mit OS-Level Prozess-Isolation (eigener OS-Prozess,
+> eigener V8-Heap, ELECTRON_RUN_AS_NODE=1). Siehe ADR-021 und
+> FEATURE-sandbox-os-isolation.md fuer die vollstaendige Spezifikation.
+
+Die **Mobile**-Sicherheitsgrenze bleibt `<iframe sandbox="allow-scripts">`:
 
 ```
 Plugin (main.js, privilegiert)

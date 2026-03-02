@@ -1,7 +1,7 @@
 # Obsilo Agent -- Vollstaendiges Backlog
 
-Stand: 2026-03-01
-Branch: `securityfixes-refactor-20250301`
+Stand: 2026-03-02
+Branch: `sandbox-os-isolation`
 
 ---
 
@@ -118,6 +118,7 @@ Branch: `securityfixes-refactor-20250301`
 | Onboarding Wizard | 5-Schritt-Flow vorhanden | `update_settings` + `configure_model` Tools fehlen |
 | Agent Skill Mastery | Level 1 (Rich Descriptions) done | Level 2 (Procedural Recipes, Auto-Promotion) + Level 3 (Episodic Learning) offen |
 | Self-Development | Spec + Level 1 (Skills als Markdown) | Level 2 (Dynamic Modules, iframe Sandbox) + Level 3 (Core Self-Modification) offen |
+| Sandbox OS-Level Isolation | Spec + ADR + Plan fertig | Implementierung auf Branch `sandbox-os-isolation` ausstehend |
 
 ### Geplant (nicht implementiert)
 
@@ -147,7 +148,7 @@ Branch: `securityfixes-refactor-20250301`
 |----|----------|---------|--------|
 | H-1 | High | `new Function()` in EsbuildWasmManager (CWE-94) | Mitigiert (SHA-256), Monitoring noetig |
 | H-2 | High | PostMessage Origin-Validierung Luecken | Offen |
-| H-3 | High | iframe Sandbox Effektivitaet in Electron | Design-Review noetig |
+| H-3 | High | iframe Sandbox Effektivitaet in Electron | Adressiert: ADR-021, child_process.fork() auf Desktop, Branch `sandbox-os-isolation` |
 | M-1 | Medium | User-controlled Regex ReDoS in SearchFilesTool | Offen |
 | M-2 | Medium | IgnoreService Glob-to-Regex ReDoS | Mitigiert (Length Guard) |
 | M-3 | Medium | SelfAuthoredSkillLoader Regex ReDoS | Offen |
@@ -175,6 +176,7 @@ Gesamt: 0 Critical, 6 High, 15 Medium, 11 Low, 5 Info
 1. Security Bug Fixes (FIX-01 bis FIX-03) -- P0
 2. Security Findings Triage (H-2, M-1, M-5)
 3. AstValidator und Permissions Hardening (laufend auf aktuellem Branch)
+4. **Sandbox OS-Level Isolation** (Branch `sandbox-os-isolation`, ADR-021) -- H-3 Remediation
 
 ### Kurzfristig (2-4 Wochen)
 

@@ -1,7 +1,7 @@
 # arc42 — Obsidian Agent Architecture
 
-**Version:** 3.3
-**Stand:** 2026-03-01
+**Version:** 3.4
+**Stand:** 2026-03-02
 **Status:** Aktuell — alle Features implementiert, Dokumentation vollstaendig
 
 ---
@@ -35,7 +35,7 @@ Obsidian Agent ist ein Obsidian-Plugin, das einen vollständigen KI-Agenten dire
 
 ### 2.1 Technische Randbedingungen
 - **Obsidian Plugin API** — Zugriff auf Vault, MetadataCache, Workspace via `app.*`
-- **Electron-Renderer** — TypeScript/Node.js, iframe-Sandbox fuer Code-Ausfuehrung (V8 Origin Isolation), kein Worker-Thread-Zugriff
+- **Electron-Renderer** — TypeScript/Node.js, Hybrid-Sandbox fuer Code-Ausfuehrung: Desktop `child_process.fork()` (OS-Level Prozess-Isolation, ADR-021), Mobile iframe (V8 Origin Isolation)
 - **No system git** — `isomorphic-git` für Checkpoints (Pure-JS, keine System-Abhängigkeit)
 - **Obsidian Sync kompatibel** — Index-Daten im `.obsidian/`-Verzeichnis für Sync
 
@@ -75,7 +75,8 @@ Obsidian Agent ist ein Obsidian-Plugin, das einen vollständigen KI-Agenten dire
 | isomorphic-git Shadow-Repo | Filesystem | ↔ (checkpoint commits) |
 | vectra LocalIndex | Filesystem | ↔ (vector read/write) |
 | Xenova Transformers | In-Process (ONNX) | ← (embeddings) |
-| iframe Sandbox | postMessage (V8 origin isolation) | ↔ (code execution) |
+| Sandbox (Desktop) | Node.js IPC via child_process.fork (OS-level process isolation) | ↔ (code execution) |
+| Sandbox (Mobile) | postMessage via iframe (V8 origin isolation) | ↔ (code execution) |
 | CDN (esm.sh, jsdelivr) | HTTPS (via requestUrl) | ← (npm packages) |
 | esbuild-wasm | In-Process (WASM) | ← (TypeScript compilation) |
 
@@ -399,7 +400,8 @@ Nutzer-Gerät:
         ├── Chat History       → .obsidian/plugins/obsidian-agent/history/
         ├── Memory Files       → .obsidian/plugins/obsidian-agent/memory/
         ├── Extraction Queue   → .obsidian/plugins/obsidian-agent/pending-extractions.json
-        ├── iframe Sandbox     → V8 origin isolation (evaluate_expression, dynamic tools)
+        ├── Sandbox (Desktop)  → child_process.fork OS-level isolation (evaluate_expression, dynamic tools)
+        ├── Sandbox (Mobile)   → iframe V8 origin isolation (evaluate_expression, dynamic tools)
         ├── esbuild-wasm       → In-Process TypeScript Compilation (~11MB, on-demand)
         ├── Package Cache      → In-Memory (CDN-Downloads: esm.sh ?bundle, jsdelivr fallback)
         └── MCP subprocesses   → stdio (lokal)
@@ -587,6 +589,7 @@ Siehe einzelne ADRs in `_devprocess/architecture/`:
 | [ADR-018](ADR-018-episodic-task-memory.md) | Episodic Task Memory (Aufzeichnung, Auto-Promotion) |
 | [ADR-019](ADR-019-electron-safestorage.md) | Electron SafeStorage (OS Keychain fuer API-Keys) |
 | [ADR-020](ADR-020-global-storage.md) | Global Storage Architecture (cross-vault Settings) |
+| [ADR-021](ADR-021-sandbox-os-isolation.md) | OS-Level Sandbox via child_process.fork() (Hybrid Desktop/Mobile) |
 
 ---
 
@@ -663,3 +666,5 @@ Siehe einzelne ADRs in `_devprocess/architecture/`:
 | **RecipeStore** | Persistiert gelernte Rezepte (Procedural Memory) im Plugin-Verzeichnis |
 | **EpisodicExtractor** | Zeichnet erfolgreiche Tool-Sequenzen auf und speichert sie als episodische Erinnerungen |
 | **RecipePromotionService** | Promoviert haeufig erfolgreiche Episoden (3+ Erfolge) automatisch zu wiederverwendbaren Rezepten |
+| **ISandboxExecutor** | Interface fuer Sandbox-Backends. Desktop: ProcessSandboxExecutor (child_process.fork, OS-Level), Mobile: IframeSandboxExecutor (iframe, V8-Level). ADR-021 |
+| **ProcessSandboxExecutor** | Desktop-Sandbox-Backend. Startet eigenstaendigen Node.js-Prozess via child_process.fork() mit ELECTRON_RUN_AS_NODE=1. OS-Level Prozess-Isolation |
