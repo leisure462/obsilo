@@ -112,7 +112,7 @@ export function buildSystemPromptForMode(
     // Normalize: if first arg has 'slug' and 'toolGroups', it's a ModeConfig (legacy call)
     // If it has 'mode' property, it's a SystemPromptConfig
     let mode: ModeConfig;
-    if ('mode' in configOrMode && 'slug' in configOrMode.mode!) {
+    if ('mode' in configOrMode && 'slug' in configOrMode.mode) {
         // Config object form
         const cfg = configOrMode;
         mode = cfg.mode;

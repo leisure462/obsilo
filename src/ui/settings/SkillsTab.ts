@@ -206,7 +206,7 @@ export class SkillsTab {
 
     private buildSelfAuthoredSkillsSection(containerEl: HTMLElement): void {
         const loader = this.plugin.selfAuthoredSkillLoader;
-        containerEl.createEl('h3', { text: 'Agent-Created Skills' });
+        containerEl.createEl('h3', { text: 'Agent-created skills' });
 
         if (!loader) {
             containerEl.createEl('p', {

@@ -41,20 +41,6 @@ interface OpenAITool {
     };
 }
 
-interface OpenAIStreamDelta {
-    role?: string;
-    content?: string | null;
-    tool_calls?: {
-        index: number;
-        id?: string;
-        type?: 'function';
-        function?: {
-            name?: string;
-            arguments?: string;
-        };
-    }[];
-}
-
 // ---------------------------------------------------------------------------
 // Tool call accumulator for streaming
 // ---------------------------------------------------------------------------

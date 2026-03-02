@@ -405,7 +405,7 @@ export default class ObsidianAgentPlugin extends Plugin {
         addIcon('obsilo-agent', OBSILO_ICON_SVG);
 
         // Ribbon icon in left activity bar
-        this.addRibbonIcon('obsilo-agent', 'Obsilo Agent', () => {
+        this.addRibbonIcon('obsilo-agent', 'Obsilo agent', () => {
             void this.activateView();
         });
 
@@ -417,14 +417,14 @@ export default class ObsidianAgentPlugin extends Plugin {
         // 4. Register commands
         this.addCommand({
             id: 'open-agent-sidebar',
-            name: 'Open Agent Sidebar',
+            name: 'Open agent sidebar',
             callback: () => this.activateView()
         });
 
         // Development: Test tool execution
         this.addCommand({
             id: 'test-tool-execution',
-            name: 'Test Tool Execution',
+            name: 'Test tool execution',
             callback: () => this.testToolExecution()
         });
 
