@@ -41,7 +41,8 @@ import { EpisodicExtractor } from './core/mastery/EpisodicExtractor';
 import { RecipePromotionService } from './core/mastery/RecipePromotionService';
 import { ConsoleRingBuffer } from './core/observability/ConsoleRingBuffer';
 import { SelfAuthoredSkillLoader } from './core/skills/SelfAuthoredSkillLoader';
-import { SandboxExecutor } from './core/sandbox/SandboxExecutor';
+import type { ISandboxExecutor } from './core/sandbox/ISandboxExecutor';
+import { createSandboxExecutor } from './core/sandbox/createSandboxExecutor';
 import { EsbuildWasmManager } from './core/sandbox/EsbuildWasmManager';
 import { DynamicToolLoader } from './core/tools/dynamic/DynamicToolLoader';
 import { EmbeddedSourceManager } from './core/self-development/EmbeddedSourceManager';
@@ -97,7 +98,7 @@ export default class ObsidianAgentPlugin extends Plugin {
     syncBridge: SyncBridge | null = null;
     ringBuffer: ConsoleRingBuffer;
     selfAuthoredSkillLoader: SelfAuthoredSkillLoader | null = null;
-    sandboxExecutor: SandboxExecutor | null = null;
+    sandboxExecutor: ISandboxExecutor | null = null;
     esbuildWasmManager: EsbuildWasmManager | null = null;
     dynamicToolLoader: DynamicToolLoader | null = null;
     embeddedSourceManager: EmbeddedSourceManager | null = null;
@@ -212,8 +213,8 @@ export default class ObsidianAgentPlugin extends Plugin {
             );
         }
 
-        // Sandbox + Dynamic Modules (Phase 3) — lazy initialization
-        this.sandboxExecutor = new SandboxExecutor(this);
+        // Sandbox + Dynamic Modules (Phase 3) — lazy initialization (ADR-021: OS-level isolation)
+        this.sandboxExecutor = createSandboxExecutor(this, this.settings.sandboxMode);
         this.esbuildWasmManager = new EsbuildWasmManager(this);
         this.dynamicToolLoader = new DynamicToolLoader(this);
 

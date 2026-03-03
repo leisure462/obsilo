@@ -2192,6 +2192,7 @@
 .tool-approval-row {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
     padding: 10px 12px;  /* Mehr Padding für bessere Sichtbarkeit */
     margin: 8px 0;       /* Mehr Abstand zu anderen Elementen */
@@ -2236,6 +2237,22 @@
     border-color: var(--interactive-accent);
     color: var(--interactive-accent);
 }
+
+/* configDir write warning — Shai Hulud Mitigation */
+.tool-approval-config-warning {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 6px 8px;
+    margin-top: 2px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--color-red) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-red) 25%, var(--background-modifier-border));
+}
+.tool-approval-warning-icon { display: flex; align-items: center; color: var(--color-red); flex-shrink: 0; margin-top: 1px; }
+.tool-approval-warning-icon svg { width: 12px; height: 12px; }
+.tool-approval-warning-text { color: var(--color-red); font-size: 11px; line-height: 1.4; }
 
 .approval-deny-small {
     background: transparent;

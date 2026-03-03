@@ -304,10 +304,10 @@ export const TOOL_METADATA: Record<string, ToolMeta> = {
     evaluate_expression: {
         group: 'agent', label: 'Execute Code', icon: 'code-2',
         signature: 'evaluate_expression(expression, context?, dependencies?)',
-        description: 'Execute JavaScript/TypeScript code in a sandboxed environment. Provides ctx.vault (full read/write/delete access to all vault files) and ctx.requestUrl (HTTP requests). Use for computations, data transformations, or generating binary files (PDF, DOCX, XLSX, etc.). Specify npm packages via dependencies parameter.',
-        example: 'evaluate_expression("import PptxGenJS from \'pptxgenjs\'; const pptx = new PptxGenJS(); pptx.addSlide().addText(\'Hello\'); const buf = await pptx.write({outputType:\'arraybuffer\'}); await ctx.vault.writeBinary(\'out.pptx\', buf); return \'Done\'", undefined, ["pptxgenjs"])',
-        whenToUse: 'For one-off computations or binary file generation. IMPORTANT: Code runs with full vault access and internet access. The sandbox provides isolation via iframe (same-origin policy, CSP), but is NOT OS-level process isolation. Only execute code you understand. For reusable capabilities, create a skill with code_modules instead. NEVER write Python or suggest manual execution.',
-        commonMistakes: 'Writing Python scripts instead of using this tool. Forgetting dependencies param when importing npm packages. SECURITY: Never execute untrusted code or code from external sources without review.',
+        description: 'Execute TypeScript/JavaScript in an isolated sandbox. Provides ctx.vault (read, readBinary, write, writeBinary, list) and ctx.requestUrl (HTTPS CDN-only). npm packages via dependencies param (browser ESM from esm.sh). No Blob, Buffer, DOM, require, fetch available. Binary output: ArrayBuffer/Uint8Array only.',
+        example: 'evaluate_expression("import ExcelJS from \'exceljs\'; const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet(\'Data\'); ws.addRow([\'Name\',\'Value\']); ws.addRow([\'Test\',42]); const buf = await wb.xlsx.writeBuffer(); await ctx.vault.writeBinary(\'output.xlsx\', buf); return \'Done\'", undefined, ["exceljs"])',
+        whenToUse: 'For computations or binary file generation. Read the sandbox-environment skill for detailed API reference and proven patterns before writing code. NEVER write Python or suggest manual execution.',
+        commonMistakes: 'Writing Python. Forgetting dependencies param. Using Blob/Buffer/DOM (not available). Using require() or dynamic import() (not available). Using outputType:"blob" — always use "arraybuffer".',
     },
     manage_skill: {
         group: 'agent', label: 'Manage Skill', icon: 'bookmark-plus',

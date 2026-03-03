@@ -11,7 +11,7 @@
 import { BaseTool } from '../BaseTool';
 import type { ToolDefinition, ToolExecutionContext } from '../types';
 import type ObsidianAgentPlugin from '../../../main';
-import type { SandboxExecutor } from '../../sandbox/SandboxExecutor';
+import type { ISandboxExecutor } from '../../sandbox/ISandboxExecutor';
 import type { EsbuildWasmManager } from '../../sandbox/EsbuildWasmManager';
 import { AstValidator } from '../../sandbox/AstValidator';
 
@@ -35,7 +35,7 @@ export class EvaluateExpressionTool extends BaseTool<'evaluate_expression'> {
 
     constructor(
         plugin: ObsidianAgentPlugin,
-        private sandboxExecutor: SandboxExecutor,
+        private sandboxExecutor: ISandboxExecutor,
         private esbuildManager: EsbuildWasmManager,
     ) {
         super(plugin);
@@ -44,7 +44,7 @@ export class EvaluateExpressionTool extends BaseTool<'evaluate_expression'> {
     getDefinition(): ToolDefinition {
         return {
             name: this.name,
-            description: 'Execute TypeScript/JavaScript in a sandboxed iframe. The sandbox provides ctx.vault (read, readBinary, write, writeBinary, list) and ctx.requestUrl for HTTP. Use for data transforms, computations, AND binary file generation (PPTX, XLSX, images via npm packages). Optionally specify dependencies to import npm packages. NEVER write Python scripts — use this tool instead.',
+            description: 'Execute TypeScript/JavaScript in an isolated sandbox. Provides ctx.vault (read, readBinary, write, writeBinary, list) and ctx.requestUrl (HTTPS CDN-only). No Blob, Buffer, DOM, require, fetch available. Binary output: ArrayBuffer/Uint8Array (outputType:"arraybuffer"). npm packages via dependencies param (browser ESM from esm.sh). NEVER write Python.',
             input_schema: {
                 type: 'object',
                 properties: {

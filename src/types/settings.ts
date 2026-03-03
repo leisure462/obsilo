@@ -523,6 +523,8 @@ export interface ObsidianAgentSettings {
     language: import('../i18n/types').Language;
 
     // Security
+    /** Sandbox execution backend: auto (Desktop=process, Mobile=iframe), process, iframe (ADR-021) */
+    sandboxMode: 'auto' | 'process' | 'iframe';
     /** Whether API keys in data.json are encrypted via Electron safeStorage (ADR-019) */
     _encrypted?: boolean;
     /** Whether data has been migrated to global storage (~/.obsidian-agent/) — ADR-020 */
@@ -728,5 +730,6 @@ export const DEFAULT_SETTINGS: ObsidianAgentSettings = {
         startedAt: '',
     },
     language: 'en',
+    sandboxMode: 'auto',
     debugMode: false,
 };

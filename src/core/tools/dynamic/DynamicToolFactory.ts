@@ -2,7 +2,7 @@
  * DynamicToolFactory
  *
  * Creates BaseTool subclass instances from dynamic tool definitions.
- * Each dynamic tool runs in the SandboxExecutor (iframe sandbox).
+ * Each dynamic tool runs in the ISandboxExecutor (process or iframe sandbox).
  *
  * Part of Self-Development Phase 3: Sandbox + Dynamic Modules.
  */
@@ -10,7 +10,7 @@
 import { BaseTool } from '../BaseTool';
 import type { ToolDefinition, ToolName, ToolExecutionContext } from '../types';
 import type ObsidianAgentPlugin from '../../../main';
-import type { SandboxExecutor } from '../../sandbox/SandboxExecutor';
+import type { ISandboxExecutor } from '../../sandbox/ISandboxExecutor';
 import type { DynamicToolDefinition } from './types';
 
 // ---------------------------------------------------------------------------
@@ -24,7 +24,7 @@ class DynamicTool extends BaseTool {
     constructor(
         private definition: DynamicToolDefinition,
         private compiledJs: string,
-        private sandboxExecutor: SandboxExecutor,
+        private sandboxExecutor: ISandboxExecutor,
         plugin: ObsidianAgentPlugin,
     ) {
         super(plugin);
@@ -62,7 +62,7 @@ export class DynamicToolFactory {
     static create(
         definition: DynamicToolDefinition,
         compiledJs: string,
-        sandboxExecutor: SandboxExecutor,
+        sandboxExecutor: ISandboxExecutor,
         plugin: ObsidianAgentPlugin,
     ): BaseTool {
         return new DynamicTool(definition, compiledJs, sandboxExecutor, plugin);

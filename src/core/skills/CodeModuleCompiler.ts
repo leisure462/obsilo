@@ -10,7 +10,7 @@
 
 import { AstValidator } from '../sandbox/AstValidator';
 import type { SelfAuthoredSkillLoader } from './SelfAuthoredSkillLoader';
-import type { SandboxExecutor } from '../sandbox/SandboxExecutor';
+import type { ISandboxExecutor } from '../sandbox/ISandboxExecutor';
 import type { CodeModuleInfo } from '../tools/dynamic/types';
 
 // ---------------------------------------------------------------------------
@@ -37,7 +37,7 @@ export interface CodeModuleInput {
 export class CodeModuleCompiler {
     constructor(
         private skillLoader: SelfAuthoredSkillLoader,
-        private sandboxExecutor: SandboxExecutor | null,
+        private sandboxExecutor: ISandboxExecutor | null,
     ) {}
 
     /**

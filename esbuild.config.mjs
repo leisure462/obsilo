@@ -1,7 +1,7 @@
 import esbuild from "esbuild";
 import process from "process";
 import builtins from "builtin-modules";
-import { copyFileSync, existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "fs";
 import { join, dirname, relative } from "path";
 import { fileURLToPath } from "url";
 
@@ -146,6 +146,25 @@ const context = await esbuild.context({
                             if (existsSync(logoSrc)) {
                                 copyFileSync(logoSrc, `${VAULT_PLUGIN_DIR}/logo.png`);
                             }
+                            if (existsSync("sandbox-worker.js")) {
+                                copyFileSync("sandbox-worker.js", `${VAULT_PLUGIN_DIR}/sandbox-worker.js`);
+                            }
+                            // Copy bundled skills to plugin skills directory
+                            const bundledSkillsDir = join(__dirname, "bundled-skills");
+                            if (existsSync(bundledSkillsDir)) {
+                                const skillDirs = readdirSync(bundledSkillsDir);
+                                for (const skillDir of skillDirs) {
+                                    const srcDir = join(bundledSkillsDir, skillDir);
+                                    if (!statSync(srcDir).isDirectory()) continue;
+                                    const destDir = `${VAULT_PLUGIN_DIR}/skills/${skillDir}`;
+                                    if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true });
+                                    const files = readdirSync(srcDir);
+                                    for (const file of files) {
+                                        copyFileSync(join(srcDir, file), join(destDir, file));
+                                    }
+                                }
+                                console.log(`[vault-deploy] Copied ${skillDirs.length} bundled skill(s)`);
+                            }
                             console.log(`[vault-deploy] → ${VAULT_PLUGIN_DIR}`);
                         } catch (e) {
                             console.warn("[vault-deploy] Copy failed:", e.message);
@@ -157,9 +176,26 @@ const context = await esbuild.context({
     ],
 });
 
+// Sandbox worker — separate OS process (ADR-021)
+const workerContext = await esbuild.context({
+    entryPoints: ["src/core/sandbox/sandbox-worker.ts"],
+    bundle: true,
+    external: [],        // Standalone Node.js, no externals needed
+    platform: "node",
+    format: "cjs",
+    target: "es2022",
+    outfile: "sandbox-worker.js",
+    logLevel: "info",
+    sourcemap: prod ? false : "inline",
+    treeShaking: true,
+});
+
 if (prod) {
+    // Worker first — vault-deploy (main's onEnd) copies sandbox-worker.js
+    await workerContext.rebuild();
     await context.rebuild();
     process.exit(0);
 } else {
     await context.watch();
+    await workerContext.watch();
 }

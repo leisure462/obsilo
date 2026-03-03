@@ -71,7 +71,7 @@ import { ManageSkillTool } from './agent/ManageSkillTool';
 import type { SelfAuthoredSkillLoader } from '../skills/SelfAuthoredSkillLoader';
 // Self-Development (Phase 3)
 import { EvaluateExpressionTool } from './agent/EvaluateExpressionTool';
-import type { SandboxExecutor } from '../sandbox/SandboxExecutor';
+import type { ISandboxExecutor } from '../sandbox/ISandboxExecutor';
 import type { EsbuildWasmManager } from '../sandbox/EsbuildWasmManager';
 import type { DynamicToolLoader } from './dynamic/DynamicToolLoader';
 // Self-Development (Phase 4)
@@ -89,7 +89,7 @@ export class ToolRegistry {
         mcpClient?: McpClient,
         ringBuffer?: ConsoleRingBuffer,
         skillLoader?: SelfAuthoredSkillLoader,
-        sandboxExecutor?: SandboxExecutor,
+        sandboxExecutor?: ISandboxExecutor,
         esbuildManager?: EsbuildWasmManager,
         dynamicToolLoader?: DynamicToolLoader,
         sourceManager?: EmbeddedSourceManager,
@@ -114,7 +114,7 @@ export class ToolRegistry {
         mcpClient?: McpClient,
         ringBuffer?: ConsoleRingBuffer,
         skillLoader?: SelfAuthoredSkillLoader,
-        sandboxExecutor?: SandboxExecutor,
+        sandboxExecutor?: ISandboxExecutor,
         esbuildManager?: EsbuildWasmManager,
         dynamicToolLoader?: DynamicToolLoader,
         sourceManager?: EmbeddedSourceManager,

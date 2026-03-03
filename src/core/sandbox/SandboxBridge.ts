@@ -70,7 +70,11 @@ export class SandboxBridge {
 
     async vaultWrite(path: string, content: string): Promise<void> {
         this.checkCircuitBreaker();
-        this.validateVaultPath(path);
+        this.validateVaultPath(path, true);
+        // M-2: Write-Size-Limit
+        if (content.length > SandboxBridge.MAX_WRITE_SIZE) {
+            throw new Error(`Write too large: ${content.length} bytes (max ${SandboxBridge.MAX_WRITE_SIZE})`);
+        }
         this.checkWriteRateLimit();
         this.logBridgeOp('vault-write', `${path} (${content.length} chars)`);
         const file = this.plugin.app.vault.getAbstractFileByPath(path);
@@ -84,7 +88,11 @@ export class SandboxBridge {
 
     async vaultWriteBinary(path: string, content: ArrayBuffer): Promise<void> {
         this.checkCircuitBreaker();
-        this.validateVaultPath(path);
+        this.validateVaultPath(path, true);
+        // M-2: Write-Size-Limit
+        if (content.byteLength > SandboxBridge.MAX_WRITE_SIZE) {
+            throw new Error(`Write too large: ${content.byteLength} bytes (max ${SandboxBridge.MAX_WRITE_SIZE})`);
+        }
         this.checkWriteRateLimit();
         this.logBridgeOp('vault-write-binary', `${path} (${content.byteLength} bytes)`);
         const file = this.plugin.app.vault.getAbstractFileByPath(path);
@@ -179,9 +187,21 @@ export class SandboxBridge {
     // Validation
     // -----------------------------------------------------------------------
 
-    private validateVaultPath(path: string): void {
+    private static readonly MAX_WRITE_SIZE = 10 * 1024 * 1024; // 10 MB (Audit M-2)
+
+    private validateVaultPath(path: string, isWrite = false): void {
         if (path.includes('..') || path.startsWith('/') || path.startsWith('\\')) {
             throw new Error(`Invalid path: ${path}`);
+        }
+
+        // Shai Hulud Mitigation: Block ALL writes to configDir (Audit L-2: Allowlist)
+        if (isWrite) {
+            const configDir = this.plugin.app.vault.configDir;
+            const normalized = path.replace(/\\/g, '/');
+
+            if (normalized.startsWith(`${configDir}/`) || normalized === configDir) {
+                throw new Error(`Sandbox write blocked: ${configDir}/ is protected`);
+            }
         }
     }
 

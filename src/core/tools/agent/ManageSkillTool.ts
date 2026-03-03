@@ -19,7 +19,7 @@ import { BaseTool } from '../BaseTool';
 import type { ToolDefinition, ToolExecutionContext } from '../types';
 import type ObsidianAgentPlugin from '../../../main';
 import type { SelfAuthoredSkillLoader } from '../../skills/SelfAuthoredSkillLoader';
-import type { SandboxExecutor } from '../../sandbox/SandboxExecutor';
+import type { ISandboxExecutor } from '../../sandbox/ISandboxExecutor';
 import type { ToolRegistry } from '../ToolRegistry';
 import { CodeModuleCompiler } from '../../skills/CodeModuleCompiler';
 import type { CodeModuleInput } from '../../skills/CodeModuleCompiler';
@@ -56,7 +56,7 @@ export class ManageSkillTool extends BaseTool<'manage_skill'> {
         plugin: ObsidianAgentPlugin,
         skillLoader: SelfAuthoredSkillLoader,
         _esbuildManager?: unknown,
-        sandboxExecutor?: SandboxExecutor | null,
+        sandboxExecutor?: ISandboxExecutor | null,
         _toolRegistry?: ToolRegistry | null,
     ) {
         super(plugin);

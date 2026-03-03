@@ -27,7 +27,18 @@ mkdir -p "$PLUGIN_DIR"
 cp manifest.json "$PLUGIN_DIR/"
 cp main.js "$PLUGIN_DIR/"
 cp styles.css "$PLUGIN_DIR/"
+[ -f sandbox-worker.js ] && cp sandbox-worker.js "$PLUGIN_DIR/"
 [ -f src/assets/logo.png ] && cp src/assets/logo.png "$PLUGIN_DIR/"
+
+# Copy bundled skills
+if [ -d "bundled-skills" ]; then
+  for skill_dir in bundled-skills/*/; do
+    skill_name=$(basename "$skill_dir")
+    mkdir -p "$PLUGIN_DIR/skills/$skill_name"
+    cp "$skill_dir"* "$PLUGIN_DIR/skills/$skill_name/" 2>/dev/null
+  done
+  echo "Copied bundled skills."
+fi
 
 echo "Deployment complete."
 echo ""

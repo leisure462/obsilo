@@ -16,7 +16,7 @@ import { TFile, TFolder } from 'obsidian';
 import { safeRegex } from '../utils/safeRegex';
 import type ObsidianAgentPlugin from '../../main';
 import type { EsbuildWasmManager } from '../sandbox/EsbuildWasmManager';
-import type { SandboxExecutor } from '../sandbox/SandboxExecutor';
+import type { ISandboxExecutor } from '../sandbox/ISandboxExecutor';
 import type { ToolRegistry } from '../tools/ToolRegistry';
 import { DynamicToolFactory } from '../tools/dynamic/DynamicToolFactory';
 import type { CodeModuleInfo, DynamicToolDefinition } from '../tools/dynamic/types';
@@ -51,7 +51,7 @@ export class SelfAuthoredSkillLoader {
     private skills = new Map<string, SelfAuthoredSkill>();
     private readonly skillsDir: string;
     private esbuildManager: EsbuildWasmManager | null;
-    private sandboxExecutor: SandboxExecutor | null;
+    private sandboxExecutor: ISandboxExecutor | null;
     private toolRegistry: ToolRegistry | null;
     /** Debounce timers for hot-reload per file path */
     private recompileTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -61,7 +61,7 @@ export class SelfAuthoredSkillLoader {
     constructor(
         private plugin: ObsidianAgentPlugin,
         esbuildManager?: EsbuildWasmManager | null,
-        sandboxExecutor?: SandboxExecutor | null,
+        sandboxExecutor?: ISandboxExecutor | null,
         toolRegistry?: ToolRegistry | null,
     ) {
         this.skillsDir = `${this.plugin.app.vault.configDir}/plugins/${this.plugin.manifest.id}/skills`;
@@ -76,7 +76,7 @@ export class SelfAuthoredSkillLoader {
      */
     setDependencies(
         esbuildManager: EsbuildWasmManager,
-        sandboxExecutor: SandboxExecutor,
+        sandboxExecutor: ISandboxExecutor,
         toolRegistry: ToolRegistry,
     ): void {
         this.esbuildManager = esbuildManager;

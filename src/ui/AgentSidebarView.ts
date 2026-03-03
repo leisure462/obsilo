@@ -2820,6 +2820,7 @@ export class AgentSidebarView extends ItemView {
                 mode: t('ui.approval.modeSwitching'), subtask: t('ui.approval.subAgents'),
                 skill: t('ui.approval.pluginSkills'),
                 'plugin-api': t('ui.approval.pluginApi'), recipe: t('ui.approval.recipes'),
+                sandbox: t('ui.approval.sandbox'),
             };
 
             // Always render in chatContainer (like Question-Cards)
@@ -2829,6 +2830,18 @@ export class AgentSidebarView extends ItemView {
             row.createSpan('tool-approval-text').setText(
                 t('ui.approval.notEnabled', { tool: this.formatToolLabel(toolName), group: groupLabels[group] ?? group })
             );
+
+            // Shai Hulud Mitigation: warn when writing to configDir (plugins/themes/settings)
+            const inputPath = typeof input['path'] === 'string' ? input['path'] : '';
+            const cfgDir = this.plugin.app.vault.configDir;
+            if (inputPath && (inputPath.startsWith(`${cfgDir}/`) || inputPath === cfgDir)) {
+                const warning = row.createDiv('tool-approval-config-warning');
+                const warnIcon = warning.createSpan('tool-approval-warning-icon');
+                setIcon(warnIcon, 'alert-triangle');
+                warning.createSpan('tool-approval-warning-text').setText(
+                    t('ui.approval.configDirWarning', { path: inputPath })
+                );
+            }
 
             const actions = row.createDiv('tool-approval-actions');
             const allowBtn = actions.createEl('button', { cls: 'tool-approval-btn approval-allow-once', text: t('ui.approval.allowOnce') });

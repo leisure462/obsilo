@@ -17,7 +17,7 @@
 import { TFile, TFolder } from 'obsidian';
 import type ObsidianAgentPlugin from '../../../main';
 import type { ToolRegistry } from '../ToolRegistry';
-import type { SandboxExecutor } from '../../sandbox/SandboxExecutor';
+import type { ISandboxExecutor } from '../../sandbox/ISandboxExecutor';
 import { DynamicToolFactory } from './DynamicToolFactory';
 import type { DynamicToolRecord } from './types';
 import type { SelfAuthoredSkillLoader } from '../../skills/SelfAuthoredSkillLoader';
@@ -40,7 +40,7 @@ export class DynamicToolLoader {
      */
     async loadAll(
         registry: ToolRegistry,
-        sandboxExecutor: SandboxExecutor,
+        sandboxExecutor: ISandboxExecutor,
     ): Promise<number> {
         const folder = this.plugin.app.vault.getAbstractFileByPath(this.toolsDir);
         if (!(folder instanceof TFolder)) return 0;

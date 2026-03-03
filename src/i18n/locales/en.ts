@@ -833,9 +833,11 @@ export const en: Translations = {
     'ui.approval.pluginSkills': 'Plugin skills',
     'ui.approval.pluginApi': 'Plugin API',
     'ui.approval.recipes': 'Recipes',
-    'ui.approval.notEnabled': '{{tool}} \u2014 {{group}} not enabled',
+    'ui.approval.sandbox': 'Sandbox execution',
+    'ui.approval.notEnabled': 'Approve {{group}} \u2014 {{tool}}',
     'ui.approval.allowOnce': 'Allow once',
-    'ui.approval.enableInSettings': 'Enable in settings',
+    'ui.approval.enableInSettings': 'Always allow',
+    'ui.approval.configDirWarning': 'Write access to protected directory: {{path}}. Files in this directory control plugins, themes, and Obsidian settings. Unintended changes can alter Obsidian behavior or install malicious code as a plugin.',
 
     // =========================================================================
     // Chat UI — Checkpoint
