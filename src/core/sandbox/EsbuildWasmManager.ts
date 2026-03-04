@@ -48,6 +48,17 @@ const INTEGRITY_HASHES: Record<string, string> = {
 // Types
 // ---------------------------------------------------------------------------
 
+/**
+ * M-2: TOFU (Trust On First Use) hash manifest for CDN-downloaded packages.
+ * Stored persistently in dev-env/package-hashes.json.
+ */
+interface PackageHashEntry {
+    hash: string;        // SHA-256 of CDN content
+    version?: string;    // npm version (only for top-level packages)
+    pinnedAt?: string;   // ISO date of first download
+}
+type PackageHashManifest = Record<string, PackageHashEntry>;
+
 /** esbuild-wasm module interface (subset we use) */
 interface EsbuildModule {
     initialize(options: { wasmModule: WebAssembly.Module }): Promise<void>;
@@ -71,6 +82,9 @@ export class EsbuildWasmManager {
     private initializing = false;
     /** Track packages for which a CDN download notice has already been shown (per session). */
     private notifiedPackages = new Set<string>();
+    /** M-2: TOFU hash manifest for package integrity verification. */
+    private hashManifest: PackageHashManifest = {};
+    private hashManifestLoaded = false;
 
     constructor(private plugin: ObsidianAgentPlugin) {
         const configDir = plugin.app.vault.configDir;
@@ -302,51 +316,191 @@ export class EsbuildWasmManager {
         console.debug(`[EsbuildWasmManager] Integrity verified: ${filename}`);
     }
 
+    // -----------------------------------------------------------------------
+    // M-2: Package Integrity (TOFU + npm Registry)
+    // -----------------------------------------------------------------------
+
+    /**
+     * M-2: Compute SHA-256 hash of string content.
+     */
+    private async computeHash(content: string): Promise<string> {
+        const data = new TextEncoder().encode(content);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    /**
+     * M-2: Load TOFU hash manifest from disk.
+     */
+    private async loadHashManifest(): Promise<void> {
+        this.hashManifestLoaded = true;
+        const path = `${this.cacheDir}/package-hashes.json`;
+        try {
+            const adapter = this.plugin.app.vault.adapter;
+            if (await adapter.exists(path)) {
+                const raw: unknown = JSON.parse(await adapter.read(path));
+                if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+                    this.hashManifest = raw as PackageHashManifest;
+                }
+            }
+        } catch {
+            console.warn('[EsbuildWasmManager] Failed to load package hash manifest, starting fresh');
+        }
+    }
+
+    /**
+     * M-2: Save TOFU hash manifest to disk.
+     */
+    private async saveHashManifest(): Promise<void> {
+        const path = `${this.cacheDir}/package-hashes.json`;
+        try {
+            const adapter = this.plugin.app.vault.adapter;
+            if (!(await adapter.exists(this.cacheDir))) {
+                await adapter.mkdir(this.cacheDir);
+            }
+            await adapter.write(path, JSON.stringify(this.hashManifest, null, 2));
+        } catch (e) {
+            console.warn('[EsbuildWasmManager] Failed to save package hash manifest:', e);
+        }
+    }
+
+    /**
+     * M-2: Query npm registry for latest version and deprecation status.
+     * Returns pinned version string (e.g. "4.17.21") or null on failure.
+     */
+    private async resolvePackageVersion(name: string): Promise<string | null> {
+        try {
+            const resp = await requestUrl({
+                url: `https://registry.npmjs.org/${encodeURIComponent(name)}/latest`,
+                headers: { 'Accept': 'application/json' },
+            });
+            if (resp.status !== 200) return null;
+            const raw: unknown = JSON.parse(resp.text);
+            if (!raw || typeof raw !== 'object') return null;
+            const data = raw as Record<string, unknown>;
+
+            // Deprecation warning
+            if (typeof data['deprecated'] === 'string') {
+                console.warn(`[EsbuildWasmManager] Package "${name}" is deprecated: ${data['deprecated']}`);
+                new Notice(`Warning: "${name}" is deprecated on npm`, 8000);
+            }
+
+            return typeof data['version'] === 'string' ? data['version'] : null;
+        } catch {
+            // Registry unavailable -- continue without pinning
+            console.debug(`[EsbuildWasmManager] npm registry unavailable for "${name}", skipping version check`);
+            return null;
+        }
+    }
+
+    /**
+     * M-2: TOFU (Trust On First Use) integrity for CDN packages.
+     * - First download: compute SHA-256, store in manifest
+     * - Version change: re-trust with new hash
+     * - Subsequent downloads: verify against stored hash, reject on mismatch
+     */
+    private async verifyPackageIntegrity(key: string, content: string, version?: string | null): Promise<void> {
+        if (!this.hashManifestLoaded) await this.loadHashManifest();
+
+        const hash = await this.computeHash(content);
+        const entry = this.hashManifest[key];
+
+        if (!entry) {
+            // First use -- trust and store
+            this.hashManifest[key] = {
+                hash,
+                version: version ?? undefined,
+                pinnedAt: new Date().toISOString(),
+            };
+            await this.saveHashManifest();
+            console.debug(`[EsbuildWasmManager] TOFU: Stored hash for "${key}": ${hash.slice(0, 16)}...`);
+            return;
+        }
+
+        // Version changed -- re-trust with new hash
+        if (version && entry.version && version !== entry.version) {
+            console.debug(`[EsbuildWasmManager] Version change for "${key}": ${entry.version} -> ${version}, re-trusting`);
+            this.hashManifest[key] = {
+                hash,
+                version,
+                pinnedAt: new Date().toISOString(),
+            };
+            await this.saveHashManifest();
+            return;
+        }
+
+        // Same version -- verify hash
+        if (hash !== entry.hash) {
+            throw new Error(
+                `Package integrity check failed for "${key}". ` +
+                `Expected SHA-256: ${entry.hash.slice(0, 16)}..., got: ${hash.slice(0, 16)}.... ` +
+                `The CDN content may have been tampered with. ` +
+                `Delete ${this.cacheDir}/package-hashes.json to re-trust.`
+            );
+        }
+        console.debug(`[EsbuildWasmManager] Integrity verified: "${key}"`);
+    }
+
+    // -----------------------------------------------------------------------
+    // Package Download
+    // -----------------------------------------------------------------------
+
     /**
      * Download an npm package from CDN and cache it in memory.
      * Prefers esm.sh ?bundle which includes all transitive dependencies.
      * Falls back to jsdelivr +esm for packages not available on esm.sh.
      *
      * After downloading, resolves absolute-path imports recursively so that
-     * sub-dependencies (e.g. pptxgenjs → jszip, or esm.sh Node polyfills)
+     * sub-dependencies (e.g. pptxgenjs -> jszip, or esm.sh Node polyfills)
      * are also available in the virtual filesystem.
      *
-     * SECURITY (M-5): Downloads run arbitrary third-party code in the sandbox.
-     * A Notice is shown on first download of each package so the user is aware.
+     * M-2: Queries npm registry for version pinning + deprecation check.
+     * Uses TOFU integrity to detect CDN content tampering on re-download.
      */
     private async ensurePackage(name: string): Promise<void> {
         if (this.packageCache.has(name)) return;
 
-        // M-5: Notify user about CDN download (once per package per session)
+        // Notify user about CDN download (once per package per session)
         if (!this.notifiedPackages.has(name)) {
             this.notifiedPackages.add(name);
             console.warn(`[EsbuildWasmManager] Downloading npm package "${name}" from CDN for sandbox execution`);
             new Notice(`Sandbox: Downloading "${name}" from CDN`, 5000);
         }
 
-        // Prefer esm.sh ?bundle — includes all transitive dependencies in one file
-        const bundleUrl = `https://esm.sh/${name}?bundle`;
+        // M-2: Resolve version from npm registry for pinning + deprecation check
+        const version = await this.resolvePackageVersion(name);
+        const versionedName = version ? `${name}@${version}` : name;
+
+        // Prefer esm.sh ?bundle with pinned version
+        const bundleUrl = `https://esm.sh/${versionedName}?bundle`;
         try {
             const response = await requestUrl({ url: bundleUrl });
             if (response.status === 200) {
+                await this.verifyPackageIntegrity(name, response.text, version);
                 this.packageCache.set(name, response.text);
                 // Resolve esm.sh internal imports (Node polyfills, actual bundle URLs)
                 await this.resolveInternalImports(response.text, 'https://esm.sh');
-                console.debug(`[EsbuildWasmManager] Cached package (esm.sh bundle): ${name}`);
+                console.debug(`[EsbuildWasmManager] Cached package (esm.sh bundle): ${versionedName}`);
                 return;
             }
-        } catch {
-            console.debug(`[EsbuildWasmManager] esm.sh bundle failed for "${name}", falling back to jsdelivr`);
+        } catch (e) {
+            // Re-throw integrity errors -- don't fall back to another CDN
+            if (e instanceof Error && e.message.includes('integrity check failed')) throw e;
+            console.debug(`[EsbuildWasmManager] esm.sh bundle failed for "${versionedName}", falling back to jsdelivr`);
         }
 
-        // Fallback: jsdelivr +esm (may lack transitive deps for complex packages)
-        const fallbackUrl = `https://cdn.jsdelivr.net/npm/${name}/+esm`;
+        // Fallback: jsdelivr +esm with pinned version
+        const fallbackUrl = version
+            ? `https://cdn.jsdelivr.net/npm/${name}@${version}/+esm`
+            : `https://cdn.jsdelivr.net/npm/${name}/+esm`;
         try {
             const response = await requestUrl({ url: fallbackUrl });
+            await this.verifyPackageIntegrity(name, response.text, version);
             this.packageCache.set(name, response.text);
             // Resolve jsdelivr sub-dependency imports (e.g. /npm/jszip@3.10.1/+esm)
             await this.resolveInternalImports(response.text, 'https://cdn.jsdelivr.net');
-            console.debug(`[EsbuildWasmManager] Cached package (jsdelivr): ${name}`);
+            console.debug(`[EsbuildWasmManager] Cached package (jsdelivr): ${versionedName}`);
         } catch (e) {
             console.warn(`[EsbuildWasmManager] Failed to download package "${name}":`, e);
             throw new Error(`Failed to download npm package "${name}": ${e instanceof Error ? e.message : String(e)}`);
@@ -391,6 +545,8 @@ export class EsbuildWasmManager {
             try {
                 const resp = await requestUrl({ url: fullUrl });
                 if (resp.status === 200) {
+                    // M-2: TOFU integrity for sub-dependencies
+                    await this.verifyPackageIntegrity(path, resp.text);
                     this.packageCache.set(path, resp.text);
                     await this.resolveInternalImports(resp.text, cdnBase, depth + 1);
                 } else {
