@@ -338,6 +338,11 @@ export class WebFetchTool extends BaseTool<'web_fetch'> {
             String.fromCharCode(parseInt(code, 16))
         );
 
+        // Post-decode safety: remove any HTML tags that emerged from entity decoding (CWE-116 fix)
+        md = md.replace(/<\/?script[^>]*>/gi, '');
+        md = md.replace(/<\/?style[^>]*>/gi, '');
+        md = md.replace(/<[^>]+>/g, '');
+
         // Collapse excessive blank lines (max 2 in a row)
         md = md.replace(/\n{3,}/g, '\n\n');
 
