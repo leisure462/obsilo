@@ -10,7 +10,7 @@ import {
 } from '../../core/document-parsers/types';
 
 /** Extensions handled by the document parser (binary formats via OS file picker). */
-const DOCUMENT_EXTENSIONS = ['.pptx', '.xlsx', '.docx', '.pdf'];
+const DOCUMENT_EXTENSIONS = ['.pptx', '.xlsx', '.docx', '.pdf', '.csv'];
 
 /** Map file extension to Lucide icon name for chip display. */
 const CHIP_ICON_MAP: Record<string, string> = {
@@ -18,6 +18,7 @@ const CHIP_ICON_MAP: Record<string, string> = {
     xlsx: 'table-2',
     docx: 'file-text',
     pdf: 'file-type',
+    csv: 'table-2',
 };
 
 /** A file (image or text) attached to the current compose turn. */
@@ -70,7 +71,7 @@ export class AttachmentHandler {
             'image/gif': 'image/gif',
             'image/webp': 'image/webp',
         };
-        const TEXT_EXTENSIONS = ['.txt', '.md', '.json', '.py', '.ts', '.js', '.jsx', '.tsx', '.css', '.html', '.xml', '.yaml', '.yml', '.csv', '.sh'];
+        const TEXT_EXTENSIONS = ['.txt', '.md', '.json', '.py', '.ts', '.js', '.jsx', '.tsx', '.css', '.html', '.xml', '.yaml', '.yml', '.sh'];
 
         const mediaType = IMAGE_TYPES[file.type];
         const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
@@ -143,6 +144,20 @@ export class AttachmentHandler {
                     block: {
                         type: 'text',
                         text: `<attached_document name="${file.path}" format="${ext}"${result.metadata.pageCount ? ` pages="${result.metadata.pageCount}"` : ''}>\n${result.text}\n</attached_document>`,
+                    },
+                });
+            } else if (ext === 'csv') {
+                // CSV — read as text, parse to Markdown table
+                const content = await this.vault.read(file);
+                const data = new TextEncoder().encode(content).buffer as ArrayBuffer;
+                const result = await parseDocument(data, ext);
+
+                this.pending.push({
+                    name: file.path,
+                    extension: ext,
+                    block: {
+                        type: 'text',
+                        text: `<attached_document name="${file.path}" format="${ext}">\n${result.text}\n</attached_document>`,
                     },
                 });
             } else {
