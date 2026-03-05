@@ -106,10 +106,6 @@ export class SemanticIndexService {
     // don't spawn dozens of simultaneous embedding calls (which freezes Obsidian).
     private autoUpdateQueue = new Set<string>();
     private autoIndexRunning = false;
-
-    // pdfjs-dist circuit breaker: set to true on first fatal import/parse error.
-    private pdfParseUnavailable = false;
-
     /** Number of unique files indexed (updated live during build). */
     docCount = 0;
     /** Live progress for external polling (e.g. Settings UI). */
@@ -968,8 +964,6 @@ export class SemanticIndexService {
      * Returns empty string on parse errors (circuit breaker for PDF-specific failures).
      */
     private async extractDocumentText(filePath: string, extension: string): Promise<string> {
-        if (extension === 'pdf' && this.pdfParseUnavailable) return '';
-
         try {
             const basePath = (this.vault.adapter as import('obsidian').FileSystemAdapter).getBasePath?.() ?? '';
             const absPath = path.join(basePath, filePath);
@@ -984,7 +978,6 @@ export class SemanticIndexService {
                 return '';
             }
             console.warn(`[SemanticIndex] Document extraction failed for ${filePath}:`, msg);
-            if (extension === 'pdf') this.pdfParseUnavailable = true;
             return '';
         }
     }
