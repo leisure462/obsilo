@@ -4903,6 +4903,81 @@
     color: var(--text-error);
 }
 
+/* ── Task Selection Modal (FEATURE-100) ─────────────────────────────── */
+
+.task-selection-modal {
+    max-width: 520px;
+}
+
+.task-selection-title {
+    margin: 0 0 4px 0;
+}
+
+.task-selection-subtitle {
+    margin: 0 0 12px 0;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+.task-selection-toggle {
+    margin-bottom: 8px;
+    font-size: var(--font-ui-small);
+}
+
+.task-selection-toggle a {
+    cursor: pointer;
+    color: var(--text-accent);
+}
+
+.task-selection-list {
+    max-height: 320px;
+    overflow-y: auto;
+    margin-bottom: 16px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+}
+
+.task-selection-item {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.task-selection-item:last-child {
+    border-bottom: none;
+}
+
+.task-selection-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.task-selection-checkbox {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.task-selection-text {
+    flex: 1;
+    line-height: 1.4;
+}
+
+.task-selection-meta {
+    margin-left: 26px;
+    margin-top: 2px;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+
+.task-selection-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
 /* ── Utility classes ──────────────────────────────────────────────────── */
 .agent-u-hidden        { display: none !important; }
 .agent-u-visible       { display: '' !important; }
