@@ -3928,7 +3928,20 @@
 .approve-edit-reject { color: var(--color-red); }
 
 /* ── DiffReviewModal ─────────────────────────────────────────────────── */
-.diff-review-modal { min-width: 700px; max-width: 95vw; }
+.diff-review-modal {
+    width: 70%;
+    height: 70%;
+    max-width: none;
+    max-height: none;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 15%;
+    left: 15%;
+    margin: 0;
+    transform: none;
+}
+.diff-review-modal .modal-content { flex: 1; overflow-y: auto; min-height: 0; }
 
 /* Semantic Group (replaces per-hunk containers) */
 .diff-semantic-group {
@@ -4615,7 +4628,7 @@
     z-index: 1000;
     min-width: 280px;
     max-width: 320px;
-    max-height: 360px;
+    max-height: 280px;
     display: flex;
     flex-direction: column;
     background: var(--background-primary);
@@ -4863,21 +4876,30 @@
     color: var(--text-muted);
 }
 
-.history-row-delete {
+.history-row-actions {
+    display: flex;
+    gap: 2px;
     opacity: 0;
+    flex-shrink: 0;
+}
+
+.history-row:hover .history-row-actions {
+    opacity: 1;
+}
+
+.history-row-action {
     background: none;
     border: none;
     cursor: pointer;
     color: var(--text-muted);
     padding: 4px;
-    flex-shrink: 0;
 }
 
-.history-row:hover .history-row-delete {
-    opacity: 1;
+.history-row-action:hover {
+    color: var(--text-normal);
 }
 
-.history-row-delete:hover {
+.history-row-action-danger:hover {
     color: var(--text-error);
 }
 

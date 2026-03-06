@@ -192,6 +192,7 @@ export class VaultFilePicker {
     private renderList(): void {
         if (!this.listEl) return;
         const query = (this.searchInput?.value ?? '').toLowerCase();
+        const isSearching = query !== '';
 
         const activeFile = this.app.workspace.getActiveFile();
 
@@ -199,23 +200,22 @@ export class VaultFilePicker {
 
         // Active note first
         if (activeFile) {
-            const match = query === ''
+            const match = !isSearching
                 || activeFile.basename.toLowerCase().includes(query)
                 || activeFile.path.toLowerCase().includes(query);
             if (match) this.filtered.push({ file: activeFile, label: t('ui.filePicker.activeFile', { name: activeFile.basename }) });
         }
 
-        // All supported files (markdown + office + data formats)
-        const SUPPORTED = new Set(['md', 'txt', 'pptx', 'xlsx', 'docx', 'pdf', 'json', 'xml', 'csv']);
-        this.app.vault.getFiles()
-            .filter(f => SUPPORTED.has(f.extension)
-                && (!activeFile || f.path !== activeFile.path)
-                && (query === ''
-                    || f.basename.toLowerCase().includes(query)
-                    || f.path.toLowerCase().includes(query)))
-            .sort((a, b) => a.basename.localeCompare(b.basename))
-            .slice(0, 80)
-            .forEach(f => this.filtered.push({ file: f, label: f.basename }));
+        if (isSearching) {
+            const SUPPORTED = new Set(['md', 'txt', 'pptx', 'xlsx', 'docx', 'pdf', 'json', 'xml', 'csv']);
+            this.app.vault.getFiles()
+                .filter(f => SUPPORTED.has(f.extension)
+                    && (!activeFile || f.path !== activeFile.path)
+                    && (f.basename.toLowerCase().includes(query) || f.path.toLowerCase().includes(query)))
+                .sort((a, b) => a.basename.localeCompare(b.basename))
+                .slice(0, 80)
+                .forEach(f => this.filtered.push({ file: f, label: f.basename }));
+        }
 
         if (this.activeIdx >= this.filtered.length) this.activeIdx = 0;
 

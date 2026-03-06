@@ -945,6 +945,13 @@ export const en: Translations = {
     'ui.history.thisWeek': 'This week',
     'ui.history.older': 'Older',
     'ui.history.messageCount': '{{count}} msgs',
+    'ui.history.copyLink': 'Copy chat link',
+    'ui.history.linkCopied': 'Chat link copied',
+    'ui.history.addToNote': 'Add link to active note',
+    'ui.history.linkAdded': 'Chat link added to note',
+    'ui.history.linkAlreadyExists': 'Link already exists in note',
+    'ui.history.linkAddFailed': 'Failed to add link',
+    'ui.history.noActiveNote': 'No active Markdown note',
 
     // =========================================================================
     // Attachment Handler

@@ -120,7 +120,11 @@ export default class ObsidianAgentPlugin extends Plugin {
         paths.add(path);
     }
 
-    /** Stamp chat-links into frontmatter for all pending paths of a conversation. */
+    /**
+     * Stamp chat-links into frontmatter for all pending paths of a conversation.
+     * Idempotent: can be called multiple times (e.g. after fallback title, then again after semantic title).
+     * Does NOT clear pending paths — call clearPendingChatLinks() for that.
+     */
     async flushPendingChatLinks(conversationId: string): Promise<void> {
         const paths = this.pendingChatLinks.get(conversationId);
         if (!paths || paths.size === 0 || !this.settings.chatLinking?.enabled) return;
@@ -128,27 +132,31 @@ export default class ObsidianAgentPlugin extends Plugin {
         const store = this.conversationStore;
         const meta = store?.list().find((m: { id: string }) => m.id === conversationId);
         const title = meta?.title || 'Chat';
-        const uri = `obsidian://obsilo-chat?id=${conversationId}`;
-        const entry = `[${title}](${uri})`;
+        const uri = `obsidian://obsilo-chat?id=${encodeURIComponent(conversationId)}`;
+        const link = `[${title}](${uri})`;
 
         for (const p of paths) {
             const file = this.app.vault.getAbstractFileByPath(p);
             if (!(file instanceof TFile) || file.extension !== 'md') continue;
             try {
                 await this.app.fileManager.processFrontMatter(file, (fm) => {
-                    const links: string[] = fm['obsilo-chats'] ?? [];
+                    const links: string[] = fm['chats'] ?? [];
                     const idx = links.findIndex((l: string) => l.includes(conversationId));
                     if (idx >= 0) {
-                        links[idx] = entry;
+                        links[idx] = link;
                     } else {
-                        links.push(entry);
+                        links.push(link);
                     }
-                    fm['obsilo-chats'] = links;
+                    fm['chats'] = links;
                 });
             } catch (e) {
                 console.warn(`[ChatLink] Failed to stamp ${p}:`, e);
             }
         }
+    }
+
+    /** Remove pending chat-link paths for a conversation (called on conversation clear/switch). */
+    clearPendingChatLinks(conversationId: string): void {
         this.pendingChatLinks.delete(conversationId);
     }
 
@@ -463,6 +471,9 @@ export default class ObsidianAgentPlugin extends Plugin {
             void this.openChatById(id);
         });
 
+        // Register 'Chats' property as list type so Properties view shows individual items
+        this.app.metadataTypeManager.setType('chats', 'multitext');
+
         // Auto-open sidebar when Obsidian starts
         this.app.workspace.onLayoutReady(() => {
             void this.activateView();
@@ -507,9 +518,10 @@ export default class ObsidianAgentPlugin extends Plugin {
     async onunload() {
         console.debug('Unloading Obsilo Agent plugin');
         // Flush any pending chat-links before shutdown
-        for (const convId of this.pendingChatLinks.keys()) {
+        for (const convId of [...this.pendingChatLinks.keys()]) {
             await this.flushPendingChatLinks(convId).catch(() => {});
         }
+        this.pendingChatLinks.clear();
         // Push global data back to vault plugin dir for Obsidian Sync (ADR-020)
         await this.syncBridge?.pushToVault().catch((e) =>
             console.warn('[Plugin] SyncBridge push failed (non-fatal):', e)
@@ -929,13 +941,13 @@ export default class ObsidianAgentPlugin extends Plugin {
             }
         }
 
-        // Reveal the view and set sidebar width to 28.5% of window
+        // Reveal the view and set sidebar width to 30% of window
         if (leaf) {
             void workspace.revealLeaf(leaf);
 
             const rightSplit = workspace.rightSplit;
             if (rightSplit && typeof rightSplit.setSize === 'function') {
-                const targetWidth = Math.round(window.innerWidth * 0.285);
+                const targetWidth = Math.round(window.innerWidth * 0.30);
                 rightSplit.setSize(targetWidth);
             }
         }

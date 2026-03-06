@@ -942,6 +942,13 @@ export const de: Translations = {
     'ui.history.thisWeek': 'Diese Woche',
     'ui.history.older': 'Aelter',
     'ui.history.messageCount': '{{count}} Nachr.',
+    'ui.history.copyLink': 'Chat-Link kopieren',
+    'ui.history.linkCopied': 'Chat-Link kopiert',
+    'ui.history.addToNote': 'Link zur aktiven Notiz hinzufuegen',
+    'ui.history.linkAdded': 'Chat-Link zur Notiz hinzugefuegt',
+    'ui.history.linkAlreadyExists': 'Link existiert bereits in der Notiz',
+    'ui.history.linkAddFailed': 'Link konnte nicht hinzugefuegt werden',
+    'ui.history.noActiveNote': 'Keine aktive Markdown-Notiz',
 
     // =========================================================================
     // Attachment Handler
