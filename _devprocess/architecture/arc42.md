@@ -116,6 +116,8 @@ Obsidian Agent ist ein Obsidian-Plugin, das einen vollständigen KI-Agenten dire
 
 15. **On-Demand Bild-Nachlade (Lazy Extraction)** — Beim Parsing nur Bild-Metadaten erfasst, Bilder erst bei Agent-Tool-Aufruf extrahiert. Vision-Gate prueft Model-Capability. System Prompt steuert Agent-Entscheidung. [ADR-025](ADR-025-on-demand-image-strategy.md)
 
+16. **Deterministische Task Extraction (Post-Processing Hook)** — Nach Agent-Completion scannt ein Regex-basierter `TaskExtractor` den Antworttext auf `- [ ]` Items. Gefundene Tasks werden im `TaskSelectionModal` praesentiert. Ausgewaehlte Items werden als eigenstaendige Notes mit 10-Property-Frontmatter-Schema (deutsch, Eisenhower-kompatibel) erstellt. Optionale Iconic-Integration fuer visuelle Differenzierung. Eine 3-View-Base (Offen/Erledigt/Alle) bietet die zentrale Uebersicht. Kein AI-Inferenzaufwand — gesamter Flow deterministisch. [ADR-026](ADR-026-post-processing-hook.md), [ADR-027](ADR-027-task-note-schema.md), [ADR-028](ADR-028-base-plugin-integration.md)
+
 ---
 
 ## 5. Bausteinsicht
@@ -228,6 +230,35 @@ Aufrufwege:
 ```
 
 ADR: [ADR-023](ADR-023-document-parser-tools.md), [ADR-024](ADR-024-parsing-library-selection.md), [ADR-025](ADR-025-on-demand-image-strategy.md).
+
+### 5.7 Ebene 2: Task Extraction Pipeline (FEATURE-100)
+
+```
+AgentSidebarView.onComplete()
+  │
+  └── maybeExtractTasks(accumulatedText)
+        │
+        ├── TaskExtractor.scan(text)           # Pure: Regex → TaskItem[]
+        │     └── Pattern: /^\s*- \[ \]\s+(.+)$/gm
+        │
+        ├── if items.length === 0 → return
+        │
+        └── new TaskSelectionModal(items)
+              │
+              └── onConfirm(selectedItems)
+                    │
+                    ├── TaskNoteCreator.createNotes(items, settings)
+                    │     ├── Frontmatter: 10 Properties (Schema ADR-027)
+                    │     ├── Iconic: icon/iconColor wenn Plugin aktiv
+                    │     ├── Vault.create() pro Note
+                    │     └── Fehler: partial success (bereits erstellte Notes bleiben)
+                    │
+                    └── TaskNoteCreator.ensureTaskBase(settings)
+                          ├── Pruefe ob Base existiert
+                          └── Erstelle 3-View Base (Offen/Erledigt/Alle)
+```
+
+ADR: [ADR-026](ADR-026-post-processing-hook.md), [ADR-027](ADR-027-task-note-schema.md), [ADR-028](ADR-028-base-plugin-integration.md). Feature-Spec: `FEATURE-100-task-extraction.md`.
 
 Tool-Beschreibungen kommen aus `toolMetadata.ts` (Single Source of Truth fuer Prompt und UI). Feature-Spec: `FEATURE-tool-metadata-registry.md`. ADR: [ADR-008](ADR-008-modular-prompt-sections.md).
 
@@ -641,6 +672,9 @@ Siehe einzelne ADRs in `_devprocess/architecture/`:
 | [ADR-023](ADR-023-document-parser-tools.md) | Document Parser als wiederverwendbare Tools (Service-Kern + Tool-Wrapper) |
 | [ADR-024](ADR-024-parsing-library-selection.md) | Parsing-Library-Auswahl: JSZip + Custom OOXML + pdfjs-dist + Native APIs |
 | [ADR-025](ADR-025-on-demand-image-strategy.md) | On-Demand Bild-Nachlade via Lazy Extraction + Vision-Gate |
+| [ADR-026](ADR-026-post-processing-hook.md) | Direkter Post-Processing Hook in onComplete fuer Task Extraction |
+| [ADR-027](ADR-027-task-note-schema.md) | Task-Note Frontmatter Schema (10 Properties, deutsch, Eisenhower-kompatibel) |
+| [ADR-028](ADR-028-base-plugin-integration.md) | Eigene Base-YAML-Generierung + Iconic-Detection via direkte Obsidian-API |
 
 ---
 
@@ -730,3 +764,9 @@ Siehe einzelne ADRs in `_devprocess/architecture/`:
 | **Vision-Gate** | Pruefung ob das aktuelle LLM-Modell Vision (Bildanalyse) unterstuetzt. ExtractDocumentImagesTool liefert erklaerenden Fehler bei Modellen ohne Vision |
 | **OOXML** | Office Open XML -- ZIP-basiertes Dateiformat von Microsoft Office (PPTX, XLSX, DOCX). Enthaelt XML-Dateien fuer Inhalte und Media-Ordner fuer Bilder |
 | **JSZip** | Leichtgewichtige JavaScript-Library (~30 KB) zum Lesen und Schreiben von ZIP-Archiven. Basis fuer alle OOXML-Parser (ADR-024) |
+| **Task Extraction** | Deterministischer Post-Processing Hook: Regex-Scan auf `- [ ]` Items in Agent-Antworten, TaskSelectionModal zur Auswahl, Task-Notes mit strukturiertem Frontmatter. Kein LLM-Call im Flow (ADR-026) |
+| **TaskExtractor** | Pure Function die Agent-Antworttext nach `- [ ]` Markdown-Patterns scannt und `TaskItem[]` zurueckgibt. Liegt in `src/core/tasks/` |
+| **TaskSelectionModal** | Obsidian Modal mit Checkbox-Liste aller erkannten Tasks. Nutzer waehlt welche Items als Task-Notes erstellt werden |
+| **TaskNoteCreator** | Service der ausgewaehlte Tasks als eigenstaendige Notes mit 10-Property-Frontmatter erstellt und die Task-Base (3 Views) generiert |
+| **Task-Frontmatter-Schema** | 10 Properties (deutsch): Typ, Status, Zusammenfassung, Erstellt, Faelligkeit, Dringend, Wichtig, Quelle, Kontext + optionale Iconic-Properties (icon, iconColor). ADR-027 |
+| **Graceful Degradation** | Pattern fuer optionale Plugin-Integration: Feature funktioniert vollstaendig ohne externe Plugins (Iconic, Bases). Fehlende Plugins fuehren zu reduziertem (aber funktionalem) Feature-Set, nicht zu Fehlern |

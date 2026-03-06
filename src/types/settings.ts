@@ -543,6 +543,9 @@ export interface ObsidianAgentSettings {
     /** Whether data has been migrated to global storage (~/.obsidian-agent/) — ADR-020 */
     _globalStorageMigrated?: boolean;
 
+    // Task Extraction (FEATURE-100, ADR-026/027/028)
+    taskExtraction: import('../core/tasks/types').TaskExtractionSettings;
+
     // Advanced
     debugMode: boolean;
 }
@@ -748,5 +751,9 @@ export const DEFAULT_SETTINGS: ObsidianAgentSettings = {
     },
     language: 'en',
     sandboxMode: 'auto',
+    taskExtraction: {
+        enabled: true,
+        taskFolder: 'Tasks',
+    },
     debugMode: false,
 };

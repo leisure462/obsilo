@@ -19,6 +19,9 @@ import { OnboardingService } from '../core/memory/OnboardingService';
 import { ContextTracker } from '../core/context/ContextTracker';
 import { ContextDisplay } from './sidebar/ContextDisplay';
 import { CondensationFeedback } from './sidebar/CondensationFeedback';
+import { scan as scanTasks } from '../core/tasks/TaskExtractor';
+import { TaskNoteCreator } from '../core/tasks/TaskNoteCreator';
+import { TaskSelectionModal } from './TaskSelectionModal';
 import { t } from '../i18n';
 
 export const VIEW_TYPE_AGENT_SIDEBAR = 'obsidian-agent-sidebar';
@@ -1712,6 +1715,12 @@ export class AgentSidebarView extends ItemView {
                     }
                     // Auto-save conversation to ConversationStore
                     this.saveCurrentConversation();
+
+                    // Task Extraction Post-Processing (ADR-026, FEATURE-100)
+                    if (this.plugin.settings.taskExtraction?.enabled && accumulatedText) {
+                        void this.maybeExtractTasks(accumulatedText);
+                    }
+
                     // Auto-title: set fallback title for immediate history display (ADR-022)
                     // Semantic titling happens later in finalizeConversation() on conversation end.
                     if (this.activeConversationId && this.uiMessages.length <= 2 && this.plugin.conversationStore) {
@@ -1971,6 +1980,39 @@ export class AgentSidebarView extends ItemView {
         store.save(this.activeConversationId, this.conversationHistory, this.uiMessages).catch((e) =>
             console.warn('[History] Save failed:', e)
         );
+    }
+
+    /**
+     * Post-processing hook: scan agent response for `- [ ]` items and show selection modal.
+     * ADR-026: Fire-and-forget (void-prefixed), does not block onComplete.
+     */
+    private async maybeExtractTasks(text: string): Promise<void> {
+        try {
+            const items = scanTasks(text);
+            if (items.length === 0) return;
+
+            const sourceNote = this.app.workspace.getActiveFile()?.basename ?? '';
+            const settings = this.plugin.settings.taskExtraction;
+
+            new TaskSelectionModal(
+                this.app,
+                items,
+                async (selected) => {
+                    try {
+                        const creator = new TaskNoteCreator(this.app);
+                        const created = await creator.createNotes(selected, settings, sourceNote);
+                        if (created.length > 0) {
+                            new Notice(`${created.length} Task-Note${created.length === 1 ? '' : 's'} erstellt`);
+                        }
+                    } catch (err) {
+                        console.warn('[TaskExtraction] Failed to create task notes:', err);
+                        new Notice('Fehler beim Erstellen der Task-Notes');
+                    }
+                },
+            ).open();
+        } catch (err) {
+            console.warn('[TaskExtraction] Scan failed:', err);
+        }
     }
 
     /** Enqueue memory extraction if the conversation meets the threshold. Fire-and-forget. */
