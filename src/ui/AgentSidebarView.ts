@@ -2765,10 +2765,17 @@ export class AgentSidebarView extends ItemView {
      */
     private addResponseActions(messageEl: HTMLElement, responseText: string, sources?: { num: number; note: string; context: string }[]): void {
         const bar = messageEl.createDiv('message-actions');
+        const meta = bar.createDiv('message-actions-meta');
+        const buttonGroup = bar.createDiv('message-actions-buttons');
+        const footerEl = messageEl.querySelector('.message-footer');
+
+        if (footerEl instanceof HTMLElement) {
+            meta.appendChild(footerEl);
+        }
 
         // Sources indicator (left-aligned, before action buttons)
         if (sources && sources.length > 0) {
-            const indicator = bar.createEl('span', { cls: 'sources-indicator' });
+            const indicator = meta.createEl('span', { cls: 'sources-indicator' });
             const iconEl = indicator.createSpan('sources-indicator-icon');
             setIcon(iconEl, 'book-open');
             indicator.createSpan({ text: t('ui.sidebar.sources', { count: sources.length }) });
@@ -2779,7 +2786,7 @@ export class AgentSidebarView extends ItemView {
         }
 
         const makeBtn = (icon: string, tooltip: string, onClick: () => void) => {
-            const btn = bar.createEl('button', { cls: 'message-action-btn', attr: { 'aria-label': tooltip } });
+            const btn = buttonGroup.createEl('button', { cls: 'message-action-btn', attr: { 'aria-label': tooltip } });
             setIcon(btn, icon);
             btn.title = tooltip;
             btn.addEventListener('click', onClick);
