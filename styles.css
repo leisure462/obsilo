@@ -299,9 +299,9 @@
 .obsidian-agent-sidebar .chat-input-container {
     flex-shrink: 0;
     box-sizing: border-box;
-    padding: 8px 0 0;
+    padding: 6px 6px 10px;
     border-top: 1px solid var(--background-modifier-border);
-    background: var(--background-primary);
+    background: transparent;
     position: relative;
 }
 
@@ -309,8 +309,8 @@
 .obsidian-agent-sidebar .chat-input-wrapper {
     display: flex;
     flex-direction: column;
-    width: auto;
-    margin: 0 12px 12px;
+    width: 100%;
+    margin: 0;
     border: 1px solid var(--background-modifier-border);
     border-radius: 6px;
     background: var(--input-background);
