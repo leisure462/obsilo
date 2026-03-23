@@ -21,22 +21,24 @@
 }
 
 /* Header */
-.agent-header {
+.obsidian-agent-sidebar .agent-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 12px;
-    min-height: 44px;
-    padding: 8px 16px;
+    box-sizing: border-box;
+    gap: 10px;
+    min-height: 38px;
+    padding: 6px 12px;
     border-bottom: 1px solid var(--background-modifier-border);
     flex-shrink: 0;
 }
 
-.agent-title {
+.obsidian-agent-sidebar .agent-title {
     display: flex;
     align-items: center;
     flex: 1 1 auto;
     min-width: 0;
+    height: 28px;
     font-size: 15.5px;
     font-weight: 700;
     font-family: Consolas, monospace;
@@ -44,8 +46,9 @@
     line-height: 1;
 }
 
-.agent-title-text {
-    display: block;
+.obsidian-agent-sidebar .agent-title-text {
+    display: inline-flex;
+    align-items: center;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -293,18 +296,20 @@
 }
 
 /* Chat Input Container (Kilo Code pattern) */
-.chat-input-container {
+.obsidian-agent-sidebar .chat-input-container {
     flex-shrink: 0;
-    padding: 12px 16px;
+    box-sizing: border-box;
+    padding: 8px 16px 16px;
     border-top: 1px solid var(--background-modifier-border);
     background: var(--background-primary);
     position: relative;
 }
 
 /* Unified bordered wrapper (like Kilo Code) */
-.chat-input-wrapper {
+.obsidian-agent-sidebar .chat-input-wrapper {
     display: flex;
     flex-direction: column;
+    width: 100%;
     border: 1px solid var(--background-modifier-border);
     border-radius: 6px;
     background: var(--input-background);
@@ -344,25 +349,29 @@
 }
 
 /* Chat Toolbar (integrated in input wrapper) */
-.chat-toolbar {
+.obsidian-agent-sidebar .chat-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 12px;
     padding: 6px 10px;
     border-top: 1px solid var(--background-modifier-border);
     background: var(--background-secondary-alt);
 }
 
-.chat-toolbar-left {
+.obsidian-agent-sidebar .chat-toolbar-left {
     display: flex;
     align-items: center;
     gap: 8px;
+    min-width: 0;
+    flex: 1 1 auto;
 }
 
-.chat-toolbar-right {
+.obsidian-agent-sidebar .chat-toolbar-right {
     display: flex;
     align-items: center;
-    gap: 6px;
+    flex-shrink: 0;
+    gap: 8px;
 }
 
 /* Context chips inside input area (top of input wrapper) */
@@ -558,43 +567,48 @@
 }
 
 /* Header right (new chat button) */
-.agent-header-right {
+.obsidian-agent-sidebar .agent-header-right {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     margin-left: auto;
-    align-self: center;
+    align-self: stretch;
     flex-shrink: 0;
 }
 
-.agent-header-tools,
-.agent-header-actions {
+.obsidian-agent-sidebar .agent-header-tools,
+.obsidian-agent-sidebar .agent-header-actions {
     display: flex;
     align-items: center;
     gap: 4px;
 }
 
-.agent-header-tools {
+.obsidian-agent-sidebar .agent-header-tools {
     min-width: 0;
 }
 
-.header-toolbar-button.web-toggle-active {
+.obsidian-agent-sidebar .header-toolbar-button.web-toggle-active {
     color: var(--interactive-accent);
 }
 
-.header-toolbar-button.web-toggle-active:hover {
+.obsidian-agent-sidebar .header-toolbar-button.web-toggle-active:hover {
     color: var(--interactive-accent-hover);
 }
 
-.header-button {
-    display: flex;
+.obsidian-agent-sidebar .header-button {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
+    align-self: center;
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    min-height: 28px;
+    margin: 0;
     padding: 0;
-    border: none;
-    background: none;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary);
+    box-shadow: none;
     color: var(--text-muted);
     cursor: pointer;
     border-radius: 4px;
@@ -602,12 +616,12 @@
     transition: color 0.1s, background 0.1s;
 }
 
-.header-button:hover {
+.obsidian-agent-sidebar .header-button:hover {
     color: var(--text-normal);
     background: var(--background-modifier-hover);
 }
 
-.header-button svg {
+.obsidian-agent-sidebar .header-button svg {
     width: 16px;
     height: 16px;
 }

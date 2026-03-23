@@ -350,8 +350,8 @@ export class AgentSidebarView extends ItemView {
         this.updateModelButton();
         this.modelButton.addEventListener('click', (e) => this.showModelMenu(e));
 
-        // Attach file button (ghost style)
-        const attachBtn = toolbarLeft.createEl('button', {
+        // Attach file button (right action cluster)
+        const attachBtn = toolbarRight.createEl('button', {
             cls: 'toolbar-button toolbar-ghost attach-button',
             attr: { 'aria-label': t('ui.sidebar.attachFile') },
         });
@@ -359,7 +359,7 @@ export class AgentSidebarView extends ItemView {
         attachBtn.addEventListener('click', () => this.attachments.openFilePicker());
 
         // Vault file button — inserts @ and triggers autocomplete
-        const vaultBtn = toolbarLeft.createEl('button', {
+        const vaultBtn = toolbarRight.createEl('button', {
             cls: 'toolbar-button toolbar-ghost vault-attach-button',
             attr: { 'aria-label': t('ui.sidebar.addVaultFile') },
         });
