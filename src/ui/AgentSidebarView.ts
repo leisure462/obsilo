@@ -178,9 +178,11 @@ export class AgentSidebarView extends ItemView {
         titleRow.createSpan('agent-title-text').setText(t('ui.sidebar.title'));
 
         const headerRight = header.createDiv('agent-header-right');
+        const headerTools = headerRight.createDiv('agent-header-tools');
+        const headerActions = headerRight.createDiv('agent-header-actions');
 
         // Settings button — moved here from toolbar
-        const settingsBtn = headerRight.createEl('button', {
+        const settingsBtn = headerTools.createEl('button', {
             cls: 'header-button',
             attr: { 'aria-label': t('ui.sidebar.settings') },
         });
@@ -190,8 +192,34 @@ export class AgentSidebarView extends ItemView {
             this.app.setting?.openTabById('obsilo-agent');
         });
 
+        // Tool picker button — moved from composer toolbar to header
+        this.toolPickerButton = headerTools.createEl('button', {
+            cls: 'header-button header-toolbar-button tool-picker-button',
+            attr: { 'aria-label': t('ui.sidebar.selectTools') },
+        });
+        setIcon(this.toolPickerButton.createSpan('toolbar-icon'), 'pocket-knife');
+        this.toolPickerButton.addEventListener('click', (e) => this.toolPicker.show(e, this.toolPickerButton!, this.containerEl));
+        this.updateToolPickerButton();
+
+        // Web search toggle — moved from composer toolbar to header
+        this.webToggleButton = headerTools.createEl('button', {
+            cls: 'header-button header-toolbar-button web-toggle-button',
+            attr: { 'aria-label': t('ui.sidebar.toggleWebSearch') },
+        });
+        setIcon(this.webToggleButton.createSpan('toolbar-icon'), 'globe');
+        this.webToggleButton.addEventListener('click', () => { void this.toggleWebSearch(); });
+        this.updateWebToggleButton();
+
+        // Ellipsis options menu — moved from composer toolbar to header
+        const ellipsisBtn = headerTools.createEl('button', {
+            cls: 'header-button header-toolbar-button ellipsis-button',
+            attr: { 'aria-label': t('ui.sidebar.moreOptions') },
+        });
+        setIcon(ellipsisBtn.createSpan('toolbar-icon'), 'ellipsis');
+        ellipsisBtn.addEventListener('click', (e) => this.showOptionsMenu(e));
+
         // History button — opens conversation history panel
-        const historyBtn = headerRight.createEl('button', {
+        const historyBtn = headerActions.createEl('button', {
             cls: 'header-button',
             attr: { 'aria-label': t('ui.sidebar.chatHistory') },
         });
@@ -199,7 +227,7 @@ export class AgentSidebarView extends ItemView {
         historyBtn.addEventListener('click', () => this.historyPanel?.toggle());
 
         // New Chat button — clears conversation history
-        const newChatBtn = headerRight.createEl('button', {
+        const newChatBtn = headerActions.createEl('button', {
             cls: 'header-button',
             attr: { 'aria-label': t('ui.sidebar.newChat') },
         });
@@ -322,24 +350,6 @@ export class AgentSidebarView extends ItemView {
         this.updateModelButton();
         this.modelButton.addEventListener('click', (e) => this.showModelMenu(e));
 
-        // Tool picker button (ghost style) — hidden for Ask mode
-        this.toolPickerButton = toolbarLeft.createEl('button', {
-            cls: 'toolbar-button toolbar-ghost tool-picker-button',
-            attr: { 'aria-label': t('ui.sidebar.selectTools') },
-        });
-        setIcon(this.toolPickerButton.createSpan('toolbar-icon'), 'pocket-knife');
-        this.toolPickerButton.addEventListener('click', (e) => this.toolPicker.show(e, this.toolPickerButton!, this.containerEl));
-        this.updateToolPickerButton();
-
-        // Web search toggle (globe icon) — quick toggle for webTools.enabled
-        this.webToggleButton = toolbarLeft.createEl('button', {
-            cls: 'toolbar-button toolbar-ghost web-toggle-button',
-            attr: { 'aria-label': t('ui.sidebar.toggleWebSearch') },
-        });
-        setIcon(this.webToggleButton.createSpan('toolbar-icon'), 'globe');
-        this.webToggleButton.addEventListener('click', () => { void this.toggleWebSearch(); });
-        this.updateWebToggleButton();
-
         // Attach file button (ghost style)
         const attachBtn = toolbarLeft.createEl('button', {
             cls: 'toolbar-button toolbar-ghost attach-button',
@@ -357,14 +367,6 @@ export class AgentSidebarView extends ItemView {
         vaultBtn.addEventListener('click', () => {
             this.vaultFilePicker.show(vaultBtn, this.containerEl);
         });
-
-        // Ellipsis options menu button
-        const ellipsisBtn = toolbarLeft.createEl('button', {
-            cls: 'toolbar-button toolbar-ghost ellipsis-button',
-            attr: { 'aria-label': t('ui.sidebar.moreOptions') },
-        });
-        setIcon(ellipsisBtn.createSpan('toolbar-icon'), 'ellipsis');
-        ellipsisBtn.addEventListener('click', (e) => this.showOptionsMenu(e));
 
         // Feature 3: Stop button (hidden by default, shown when task is running)
         this.stopButton = toolbarRight.createEl('button', {
